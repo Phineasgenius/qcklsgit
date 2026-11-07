@@ -32,8 +32,8 @@ export interface Question {
     easy?: string;
   };
   answer: string;
+  funda?: string; // Expected funda / concept which is also accepted if given
   fundaKeywords?: string[];
-  isFunda: boolean;
   status: 'draft' | 'active' | 'archived';
   date: string;
   createdAt: string;

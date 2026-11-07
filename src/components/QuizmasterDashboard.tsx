@@ -1,23 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Question } from '@/types';
+import { Question, User } from '@/types';
 import { 
   getStoredQuestions, 
   saveStoredQuestions, 
   setActiveQuestionId, 
   getActiveQuestionId,
-  getStoredSubmissions
+  getStoredSubmissions,
+  getStoredUsers,
+  deleteUser
 } from '@/lib/storage';
 import { 
   ShieldCheck, 
   PlusCircle, 
   UploadCloud, 
-  CheckCircle, 
   Trash2, 
   X,
   History,
-  Layers
+  Layers,
+  Users as UsersIcon,
+  AlertTriangle
 } from 'lucide-react';
 
 interface QuizmasterDashboardProps {
@@ -32,10 +35,11 @@ export function QuizmasterDashboard({
   onQuestionActivated,
 }: QuizmasterDashboardProps) {
   const [questions, setQuestions] = useState<Question[]>(() => getStoredQuestions());
+  const [users, setUsers] = useState<User[]>(() => getStoredUsers().filter(u => u.role === 'user'));
   const [activeQId, setActiveQIdState] = useState<string>(() => getActiveQuestionId());
-  const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'submissions'>('manage');
+  const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'users' | 'submissions'>('manage');
 
-  // Form State
+  // Form State (no placeholders)
   const [title, setTitle] = useState('');
   const [questionText, setQuestionText] = useState('');
   const [hintCount, setHintCount] = useState<1 | 2 | 3>(3);
@@ -43,16 +47,37 @@ export function QuizmasterDashboard({
   const [hintMedium, setHintMedium] = useState('');
   const [hintEasy, setHintEasy] = useState('');
   const [answer, setAnswer] = useState('');
-  const [fundaKeywords, setFundaKeywords] = useState('');
-  const [isFunda, setIsFunda] = useState(true);
+  const [funda, setFunda] = useState('');
   const [formMsg, setFormMsg] = useState('');
 
   if (!isOpen) return null;
 
   const handleCreateQuestion = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !questionText.trim() || !answer.trim()) {
-      setFormMsg('Please fill in title, question text, and answer.');
+    setFormMsg('');
+
+    if (!title.trim()) {
+      setFormMsg('Question title is empty. Please enter a title.');
+      return;
+    }
+    if (!questionText.trim()) {
+      setFormMsg('Question text is empty. Please enter the question prompt.');
+      return;
+    }
+    if (!hintDifficult.trim()) {
+      setFormMsg('Hint 1 is empty. Please provide at least the first clue.');
+      return;
+    }
+    if (hintCount >= 2 && !hintMedium.trim()) {
+      setFormMsg('Hint 2 is empty. Please provide the medium clue.');
+      return;
+    }
+    if (hintCount === 3 && !hintEasy.trim()) {
+      setFormMsg('Hint 3 is empty. Please provide the easiest clue.');
+      return;
+    }
+    if (!answer.trim()) {
+      setFormMsg('Canonical answer is empty. Please provide the answer.');
       return;
     }
 
@@ -72,11 +97,8 @@ export function QuizmasterDashboard({
         easy: hintCount === 3 ? (hintEasy.trim() || undefined) : undefined,
       },
       answer: answer.trim(),
-      fundaKeywords: fundaKeywords
-        .split(',')
-        .map(k => k.trim())
-        .filter(Boolean),
-      isFunda,
+      funda: funda.trim() || undefined,
+      fundaKeywords: funda ? funda.split(/[,;/|]/).map(k => k.trim()).filter(Boolean) : [],
       status: 'draft',
       date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
@@ -92,8 +114,8 @@ export function QuizmasterDashboard({
     setHintMedium('');
     setHintEasy('');
     setAnswer('');
-    setFundaKeywords('');
-    setFormMsg('Question added successfully to the repository!');
+    setFunda('');
+    setFormMsg('Question saved successfully to the dump!');
     setActiveTab('manage');
   };
 
@@ -112,6 +134,13 @@ export function QuizmasterDashboard({
     }
   };
 
+  const handleDeleteUserAccount = (userId: string, userName: string, userUid: string) => {
+    if (confirm(`Permanently delete account for ${userName} (${userUid})?`)) {
+      deleteUser(userId);
+      setUsers(getStoredUsers().filter(u => u.role === 'user'));
+    }
+  };
+
   const submissions = getStoredSubmissions();
 
   return (
@@ -126,12 +155,9 @@ export function QuizmasterDashboard({
             <div>
               <h3 className="text-xl font-black text-[var(--ink)] flex items-center gap-2">
                 <span>Quizmaster Console</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--red)] text-white border-[1.5px] border-[var(--ink)]">
-                  Phineas
-                </span>
               </h3>
               <p className="text-xs text-[var(--text-secondary)] font-medium">
-                Draft questions with 1-3 hints, click upload to set Question of the Day
+                Manage questions, upload Question of the Day, and manage accounts
               </p>
             </div>
           </div>
@@ -144,7 +170,7 @@ export function QuizmasterDashboard({
         </div>
 
         {/* Tab Switcher */}
-        <div className="p-3 border-b-[2px] border-[var(--ink)] flex items-center gap-2 bg-[var(--paper)]">
+        <div className="p-3 border-b-[2px] border-[var(--ink)] flex items-center gap-2 bg-[var(--paper)] flex-wrap">
           <button
             onClick={() => setActiveTab('manage')}
             className={`btn-neo !py-1 !px-3 text-xs ${
@@ -161,7 +187,19 @@ export function QuizmasterDashboard({
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            <span>Add / Dump Question</span>
+            <span>Add Question</span>
+          </button>
+          <button
+            onClick={() => {
+              setUsers(getStoredUsers().filter(u => u.role === 'user'));
+              setActiveTab('users');
+            }}
+            className={`btn-neo !py-1 !px-3 text-xs ${
+              activeTab === 'users' ? 'btn-neo-yellow' : 'btn-neo-secondary'
+            }`}
+          >
+            <UsersIcon className="w-3.5 h-3.5" />
+            <span>Manage Users ({users.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('submissions')}
@@ -177,73 +215,75 @@ export function QuizmasterDashboard({
         {/* Tab 1: Repository & Upload */}
         {activeTab === 'manage' && (
           <div className="overflow-y-auto p-5 flex-1 space-y-3">
-            {questions.map((q) => {
-              const isActive = q.id === activeQId;
+            {questions.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
+                Repository is empty. Add a question using the &quot;Add Question&quot; tab.
+              </div>
+            ) : (
+              questions.map((q) => {
+                const isActive = q.id === activeQId;
 
-              return (
-                <div
-                  key={q.id}
-                  className={`p-4 rounded-xl border-[2px] border-[var(--ink)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                    isActive ? 'bg-[var(--yellow)]/20 shadow-[4px_4px_0_var(--ink)]' : 'bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)]'
-                  }`}
-                >
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-                        EDITION #{q.edition}
-                      </span>
-                      {isActive && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--teal)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
-                          ● ACTIVE QUESTION OF THE DAY
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-4 rounded-xl border-[2px] border-[var(--ink)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                      isActive ? 'bg-[var(--yellow)]/20 shadow-[4px_4px_0_var(--ink)]' : 'bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)]'
+                    }`}
+                  >
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
+                          EDITION #{q.edition}
+                        </span>
+                        {isActive && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--teal)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
+                            ● ACTIVE QUESTION OF THE DAY
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-extrabold text-base text-[var(--ink)]">
+                        {q.title}
+                      </h4>
+                      <p className="text-xs text-[var(--text-secondary)] line-clamp-1 font-medium">
+                        {q.questionText}
+                      </p>
+                      <div className="text-[11px] font-mono text-[var(--text-muted)] font-semibold">
+                        Answer: <strong>{q.answer}</strong>
+                        {q.funda && <span> • Expected Funda: <em>{q.funda}</em></span>}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      {!isActive ? (
+                        <button
+                          onClick={() => handleUploadQOTD(q.id)}
+                          className="btn-neo btn-neo-primary !py-1.5 !px-3 text-xs"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>Upload (Make Active)</span>
+                        </button>
+                      ) : (
+                        <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[var(--teal)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
+                          Active Today
                         </span>
                       )}
-                      {q.isFunda && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[var(--lilac)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
-                          FUNDA
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="font-extrabold text-base text-[var(--ink)]">
-                      {q.title}
-                    </h4>
-                    <p className="text-xs text-[var(--text-secondary)] line-clamp-1 font-medium">
-                      {q.questionText}
-                    </p>
-                    <div className="text-[11px] font-mono text-[var(--text-muted)] font-semibold">
-                      Answer: <strong>{q.answer}</strong> • Hints: {[q.hints.difficult, q.hints.medium, q.hints.easy].filter(Boolean).length} configured
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    {!isActive ? (
                       <button
-                        onClick={() => handleUploadQOTD(q.id)}
-                        className="btn-neo btn-neo-primary !py-1.5 !px-3 text-xs"
+                        onClick={() => handleDeleteQuestion(q.id)}
+                        className="p-1.5 rounded-lg border-[1.5px] border-[var(--ink)] text-[var(--red)] hover:bg-[var(--paper-deep)]"
+                        title="Delete Question"
                       >
-                        <UploadCloud className="w-3.5 h-3.5" />
-                        <span>Upload (Make Active)</span>
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    ) : (
-                      <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[var(--teal)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
-                        Active Today
-                      </span>
-                    )}
-
-                    <button
-                      onClick={() => handleDeleteQuestion(q.id)}
-                      className="p-1.5 rounded-lg border-[1.5px] border-[var(--ink)] text-[var(--red)] hover:bg-[var(--paper-deep)]"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
-        {/* Tab 2: New Question Form */}
+        {/* Tab 2: Add Question Form (NO PLACEHOLDERS) */}
         {activeTab === 'new' && (
           <form onSubmit={handleCreateQuestion} className="overflow-y-auto p-5 flex-1 space-y-4">
             {formMsg && (
@@ -255,14 +295,12 @@ export function QuizmasterDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
-                  Question Title / Topic
+                  Question Title
                 </label>
                 <input
                   type="text"
-                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. The Belagavi Accord"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
                 />
               </div>
@@ -293,11 +331,9 @@ export function QuizmasterDashboard({
                 Question Text (Question on the top)
               </label>
               <textarea
-                required
                 rows={3}
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Write the full question prompt..."
                 className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
               />
             </div>
@@ -305,14 +341,12 @@ export function QuizmasterDashboard({
             {/* Hint Tier 1 */}
             <div className="space-y-1">
               <label className="text-xs font-black uppercase text-[var(--coral)]">
-                Hint 1 • Toughest Hint (Drops max score to 90★)
+                Hint 1 • Toughest Hint (Caps score at 90★)
               </label>
               <input
                 type="text"
-                required
                 value={hintDifficult}
                 onChange={(e) => setHintDifficult(e.target.value)}
-                placeholder="The hardest clue..."
                 className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
               />
             </div>
@@ -321,14 +355,12 @@ export function QuizmasterDashboard({
             {hintCount >= 2 && (
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-[var(--yellow)]">
-                  Hint 2 • Medium Hint (Drops max score to 70★)
+                  Hint 2 • Medium Hint (Caps score at 70★)
                 </label>
                 <input
                   type="text"
-                  required
                   value={hintMedium}
                   onChange={(e) => setHintMedium(e.target.value)}
-                  placeholder="Clearer contextual clue..."
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
                 />
               </div>
@@ -338,14 +370,12 @@ export function QuizmasterDashboard({
             {hintCount === 3 && (
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-[var(--teal)]">
-                  Hint 3 • Easiest Hint (Drops max score to 50★)
+                  Hint 3 • Easiest Hint (Caps score at 50★)
                 </label>
                 <input
                   type="text"
-                  required
                   value={hintEasy}
                   onChange={(e) => setHintEasy(e.target.value)}
-                  placeholder="The most direct pointer..."
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
                 />
               </div>
@@ -358,39 +388,23 @@ export function QuizmasterDashboard({
                 </label>
                 <input
                   type="text"
-                  required
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="e.g. Mahatma Gandhi"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
-                  Funda Keywords (comma-separated for close checking)
+                  Expected Funda / Concept (also accepted if given)
                 </label>
                 <input
                   type="text"
-                  value={fundaKeywords}
-                  onChange={(e) => setFundaKeywords(e.target.value)}
-                  placeholder="e.g. gandhi, belgaum, congress, 1924"
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-mono font-medium"
+                  value={funda}
+                  onChange={(e) => setFunda(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
                 />
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="fundaCheck"
-                checked={isFunda}
-                onChange={(e) => setIsFunda(e.target.checked)}
-                className="w-4 h-4 rounded border-[2px] border-[var(--ink)] text-[var(--red)]"
-              />
-              <label htmlFor="fundaCheck" className="text-xs font-bold text-[var(--ink)] cursor-pointer">
-                Enable &quot;Give Funda&quot; fuzzy matching (allows conceptually close answers)
-              </label>
             </div>
 
             <div className="pt-2 flex justify-end">
@@ -401,7 +415,54 @@ export function QuizmasterDashboard({
           </form>
         )}
 
-        {/* Tab 3: Submissions */}
+        {/* Tab 3: Manage Users (Admin Delete Feature) */}
+        {activeTab === 'users' && (
+          <div className="overflow-y-auto p-5 flex-1 space-y-3">
+            <div className="text-xs font-bold text-[var(--text-secondary)] pb-2 border-b-[2px] border-[var(--ink)]">
+              Registered Student Accounts ({users.length}) — Delete accounts when required.
+            </div>
+
+            {users.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
+                No registered student accounts found.
+              </div>
+            ) : (
+              users.map((u) => {
+                const cw = u.wrongCount === 0 ? u.correctCount : (u.correctCount / u.wrongCount).toFixed(2);
+                return (
+                  <div
+                    key={u.id}
+                    className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] flex items-center justify-between gap-3 shadow-[2px_2px_0_var(--ink)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--yellow)] font-black text-sm flex items-center justify-center">
+                        {u.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-sm text-[var(--ink)]">
+                          {u.name}
+                        </div>
+                        <div className="font-mono text-xs text-[var(--red)] font-bold">
+                          UID: {u.uid} • {u.points} ★ • {cw} CW ({u.correctCount}C / {u.wrongCount}W)
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteUserAccount(u.id, u.name, u.uid)}
+                      className="btn-neo btn-neo-secondary !py-1.5 !px-3 text-xs text-[var(--red)]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete User</span>
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Tab 4: Submissions */}
         {activeTab === 'submissions' && (
           <div className="overflow-y-auto p-5 flex-1 space-y-2">
             {submissions.length === 0 ? (

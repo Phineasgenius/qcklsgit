@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { User, ShieldCheck, KeyRound, X, Sparkles, GraduationCap } from 'lucide-react';
+import Image from 'next/image';
+import { ShieldCheck, X } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -35,6 +36,14 @@ export function AuthModal({
   const handleUserLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    if (!userUid.trim()) {
+      setErrorMsg('College UID is empty. Please enter your college UID.');
+      return;
+    }
+    if (!userPass.trim()) {
+      setErrorMsg('Password is empty. Please enter your password.');
+      return;
+    }
     const res = loginUser(userUid, userPass);
     if (res.success) {
       setSuccessMsg(res.message);
@@ -50,6 +59,18 @@ export function AuthModal({
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    if (!regName.trim()) {
+      setErrorMsg('Real Name is empty. Please enter your full real name.');
+      return;
+    }
+    if (!regUid.trim()) {
+      setErrorMsg('College UID is empty. Please enter your college UID.');
+      return;
+    }
+    if (!regPass.trim()) {
+      setErrorMsg('Password is empty. Please create a password.');
+      return;
+    }
     const res = registerUser(regName, regUid, regPass);
     if (res.success) {
       setSuccessMsg(res.message);
@@ -65,6 +86,14 @@ export function AuthModal({
   const handleQMLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    if (!qmUser.trim()) {
+      setErrorMsg('Quizmaster Username is empty.');
+      return;
+    }
+    if (!qmPass.trim()) {
+      setErrorMsg('Quizmaster Password is empty.');
+      return;
+    }
     const res = loginQM(qmUser, qmPass);
     if (res.success) {
       setSuccessMsg(res.message);
@@ -80,18 +109,24 @@ export function AuthModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div className="card-neo w-full max-w-md p-6 bg-[var(--bg-secondary)] space-y-5">
-        {/* Header */}
+        {/* Header with Official Logo */}
         <div className="flex items-center justify-between pb-4 border-b-[2px] border-[var(--ink)]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-[var(--yellow)] border-[2px] border-[var(--ink)] flex items-center justify-center shadow-[2px_2px_0_var(--ink)]">
-              <GraduationCap className="w-5 h-5 text-[var(--ink)]" />
+          <div className="flex items-center gap-3">
+            <div className="relative w-11 h-11 rounded-full border-[2px] border-[var(--ink)] bg-white overflow-hidden shadow-[2px_2px_0_var(--ink)] shrink-0">
+              <Image
+                src="/logo.png"
+                alt="Quiz Club KLS GIT"
+                width={44}
+                height={44}
+                className="object-cover w-full h-full"
+              />
             </div>
             <div>
               <h3 className="text-xl font-black text-[var(--ink)]">
-                {tab === 'qm' ? 'Quizmaster Access' : 'Quiz Club KLS GIT'}
+                {tab === 'qm' ? 'Quizmaster Access' : tab === 'register' ? 'Member Registration' : 'Member Sign In'}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] font-medium">
-                {tab === 'qm' ? 'Credentials: phineas / phineastheqm' : 'College ID Card Authentication'}
+                Quiz Club KLS GIT
               </p>
             </div>
           </div>
@@ -147,14 +182,12 @@ export function AuthModal({
           <form onSubmit={handleUserLogin} className="space-y-4">
             <div className="space-y-1">
               <label className="text-xs font-extrabold uppercase text-[var(--text-secondary)]">
-                College UID (From ID Card)
+                College UID (as printed on your college ID card)
               </label>
               <input
                 type="text"
-                required
                 value={userUid}
                 onChange={(e) => setUserUid(e.target.value)}
-                placeholder="e.g. 25u0101"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
@@ -164,10 +197,8 @@ export function AuthModal({
               </label>
               <input
                 type="password"
-                required
                 value={userPass}
                 onChange={(e) => setUserPass(e.target.value)}
-                placeholder="••••••••"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
@@ -189,23 +220,19 @@ export function AuthModal({
               </label>
               <input
                 type="text"
-                required
                 value={regName}
                 onChange={(e) => setRegName(e.target.value)}
-                placeholder="e.g. Rohan Kulkarni"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm font-semibold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-extrabold uppercase text-[var(--text-secondary)]">
-                College UID (On ID Card)
+                College UID (as printed on your college ID card)
               </label>
               <input
                 type="text"
-                required
                 value={regUid}
                 onChange={(e) => setRegUid(e.target.value)}
-                placeholder="e.g. 25u0101"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
@@ -215,10 +242,8 @@ export function AuthModal({
               </label>
               <input
                 type="password"
-                required
                 value={regPass}
                 onChange={(e) => setRegPass(e.target.value)}
-                placeholder="••••••••"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
@@ -226,12 +251,12 @@ export function AuthModal({
               type="submit"
               className="btn-neo btn-neo-primary w-full !py-3 text-sm"
             >
-              Register & Join Leaderboard
+              Register & Join
             </button>
           </form>
         )}
 
-        {/* Tab 3: Quizmaster Login */}
+        {/* Tab 3: Quizmaster Login (Zero Credentials Leak!) */}
         {tab === 'qm' && (
           <form onSubmit={handleQMLogin} className="space-y-4">
             <div className="space-y-1">
@@ -240,10 +265,8 @@ export function AuthModal({
               </label>
               <input
                 type="text"
-                required
                 value={qmUser}
                 onChange={(e) => setQmUser(e.target.value)}
-                placeholder="phineas"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>
@@ -253,10 +276,8 @@ export function AuthModal({
               </label>
               <input
                 type="password"
-                required
                 value={qmPass}
                 onChange={(e) => setQmPass(e.target.value)}
-                placeholder="phineastheqm"
                 className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
               />
             </div>

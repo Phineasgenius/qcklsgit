@@ -32,10 +32,10 @@ export function ShareModal({
   ].join(' ');
 
   const shareText = `🏛️ Quiz Club KLS GIT • Edition #${question.edition}
-⭐ Cracked for ${pointsAwarded} / 100 Points!
+⭐ Solved for ${pointsAwarded} / 100 Points!
 🔍 Clues: ${clueBoxes}
-👤 Quizzed by: ${currentUser?.name || 'A KLS GIT Scholar'} (${currentUser?.uid || '25u0101'})
-🎯 Play Question of the Day: https://qcklsgit.vercel.app`;
+👤 Quizzed by: ${currentUser?.name || 'KLS GIT Member'} (${currentUser?.uid || 'Student'})
+🎯 Question of the Day: https://qcklsgit.vercel.app`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareText);

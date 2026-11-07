@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
-import { getStoredUsers, saveStoredUsers } from '@/lib/storage';
+import { getStoredUsers, saveStoredUsers, deleteUser } from '@/lib/storage';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -11,6 +11,7 @@ interface AuthContextType {
   registerUser: (name: string, uid: string, pass: string) => { success: boolean; message: string };
   loginQM: (username: string, pass: string) => { success: boolean; message: string };
   logout: () => void;
+  deleteMyAccount: () => void;
   refreshUser: () => void;
 }
 
@@ -146,10 +147,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(CURRENT_USER_KEY);
   };
 
+  const deleteMyAccount = () => {
+    if (!currentUser) return;
+    deleteUser(currentUser.id);
+    logout();
+  };
+
   const isQM = currentUser?.role === 'quizmaster';
 
   return (
-    <AuthContext.Provider value={{ currentUser, isQM, loginUser, registerUser, loginQM, logout, refreshUser }}>
+    <AuthContext.Provider value={{ currentUser, isQM, loginUser, registerUser, loginQM, logout, deleteMyAccount, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,18 +6,13 @@ import { User } from '@/types';
 import { 
   Trophy, 
   Search, 
-  Crosshair, 
-  TrendingUp, 
-  Award, 
-  Sparkles, 
-  User as UserIcon,
   Crown
 } from 'lucide-react';
 
 export function LeaderboardView() {
-  const [boardData, setBoardData] = useState<(User & { kdRatio: number; rank: number })[]>([]);
+  const [boardData, setBoardData] = useState<(User & { cwRatio: number; rank: number })[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'points' | 'kd'>('points');
+  const [sortBy, setSortBy] = useState<'points' | 'cw'>('points');
 
   useEffect(() => {
     setBoardData(getLeaderboard());
@@ -33,7 +28,7 @@ export function LeaderboardView() {
         if (b.points !== a.points) return b.points - a.points;
         return b.correctCount - a.correctCount;
       } else {
-        if (b.kdRatio !== a.kdRatio) return b.kdRatio - a.kdRatio;
+        if (b.cwRatio !== a.cwRatio) return b.cwRatio - a.cwRatio;
         return b.points - a.points;
       }
     });
@@ -43,17 +38,14 @@ export function LeaderboardView() {
   const top3 = boardData.find(u => u.rank === 3);
 
   return (
-    <div className="space-y-10 animate-fadeIn">
-      {/* 1. TOP 3 PODIUM SECTION (IN LITKOD STYLE) */}
+    <div className="space-y-8 animate-fadeIn">
+      {/* 1. TOP 3 PODIUM SECTION */}
       {boardData.length >= 3 && (
-        <div className="pt-4">
+        <div className="pt-2">
           <div className="text-center mb-6">
             <h3 className="text-2xl font-black tracking-tight text-[var(--ink)]">
               Top Quizzers Podium
             </h3>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">
-              Leading the KLS GIT Hall of Fame
-            </p>
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-5 items-end">
@@ -63,7 +55,7 @@ export function LeaderboardView() {
                 <div className="w-8 h-8 rounded-full bg-[var(--silver)] border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute -top-4 shadow-[2px_2px_0_var(--ink)] text-[var(--ink)]">
                   2
                 </div>
-                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--silver)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2">
+                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--silver)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2 text-[var(--ink)]">
                   {top2.name.charAt(0)}
                 </div>
                 <h4 className="font-extrabold text-base text-[var(--ink)] truncate max-w-[200px]">
@@ -76,18 +68,18 @@ export function LeaderboardView() {
                   {top2.points} ★
                 </div>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-                  {top2.kdRatio.toFixed(2)} K/D ({top2.correctCount}C / {top2.wrongCount}W)
+                  {top2.cwRatio.toFixed(2)} CW ({top2.correctCount}C / {top2.wrongCount}W)
                 </span>
               </div>
             )}
 
-            {/* 1st Place (Gold) - Elevated & Highlighted */}
+            {/* 1st Place (Gold) */}
             {top1 && (
               <div className="card-neo card-neo-hover w-full md:w-[290px] p-6 flex flex-col items-center text-center relative bg-[var(--bg-secondary)] border-[3px] border-[var(--ink)] shadow-[10px_10px_0_var(--ink)] order-1 md:order-2 md:-translate-y-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--gold)] border-[2.5px] border-[var(--ink)] font-black text-base flex items-center justify-center absolute -top-5 shadow-[3px_3px_0_var(--ink)] text-[var(--ink)]">
                   <Crown className="w-5 h-5 fill-[var(--ink)] text-[var(--ink)]" />
                 </div>
-                <div className="w-20 h-20 rounded-xl border-[3px] border-[var(--gold)] bg-[var(--yellow)]/30 flex items-center justify-center text-3xl font-black my-2">
+                <div className="w-20 h-20 rounded-xl border-[3px] border-[var(--gold)] bg-[var(--yellow)]/30 flex items-center justify-center text-3xl font-black my-2 text-[var(--ink)]">
                   {top1.name.charAt(0)}
                 </div>
                 <h4 className="font-extrabold text-lg text-[var(--ink)] truncate max-w-[220px]">
@@ -100,7 +92,7 @@ export function LeaderboardView() {
                   {top1.points} ★
                 </div>
                 <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
-                  {top1.kdRatio.toFixed(2)} K/D Ratio ({top1.correctCount}C / {top1.wrongCount}W)
+                  {top1.cwRatio.toFixed(2)} CW Ratio ({top1.correctCount}C / {top1.wrongCount}W)
                 </span>
               </div>
             )}
@@ -111,7 +103,7 @@ export function LeaderboardView() {
                 <div className="w-8 h-8 rounded-full bg-[var(--bronze)] border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute -top-4 shadow-[2px_2px_0_var(--ink)] text-[var(--ink)]">
                   3
                 </div>
-                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--bronze)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2">
+                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--bronze)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2 text-[var(--ink)]">
                   {top3.name.charAt(0)}
                 </div>
                 <h4 className="font-extrabold text-base text-[var(--ink)] truncate max-w-[200px]">
@@ -124,7 +116,7 @@ export function LeaderboardView() {
                   {top3.points} ★
                 </div>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-                  {top3.kdRatio.toFixed(2)} K/D ({top3.correctCount}C / {top3.wrongCount}W)
+                  {top3.cwRatio.toFixed(2)} CW ({top3.correctCount}C / {top3.wrongCount}W)
                 </span>
               </div>
             )}
@@ -132,18 +124,22 @@ export function LeaderboardView() {
         </div>
       )}
 
-      {/* 2. SEARCH & SORT TOOLBAR */}
-      <div className="card-neo p-4 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[var(--bg-secondary)]">
+      {/* 2. SEARCH & SORT TOOLBAR (NO PLACEHOLDERS) */}
+      <div className="card-neo p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[var(--bg-secondary)]">
         {/* Search */}
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or college UID..."
-            className="w-full pl-10 pr-4 py-2 rounded-full border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:shadow-[2px_2px_0_var(--ink)]"
-          />
+        <div className="w-full sm:w-80 space-y-1">
+          <label className="text-[11px] font-extrabold uppercase text-[var(--text-secondary)]">
+            Search by Name or College UID
+          </label>
+          <div className="relative">
+            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-full border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-semibold focus:outline-none focus:shadow-[2px_2px_0_var(--ink)]"
+            />
+          </div>
         </div>
 
         {/* Sort controls */}
@@ -161,14 +157,14 @@ export function LeaderboardView() {
               Points ★
             </button>
             <button
-              onClick={() => setSortBy('kd')}
+              onClick={() => setSortBy('cw')}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                sortBy === 'kd'
+                sortBy === 'cw'
                   ? 'bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] shadow-[1px_1px_0_var(--ink)]'
                   : 'text-[var(--text-secondary)]'
               }`}
             >
-              K/D Ratio
+              CW Ratio
             </button>
           </div>
         </div>
@@ -180,7 +176,7 @@ export function LeaderboardView() {
         <div className="grid grid-cols-12 px-5 py-3 border-b-[2.5px] border-[var(--ink)] bg-[var(--paper-deep)] text-xs font-black uppercase tracking-wider text-[var(--ink)]">
           <span className="col-span-2 sm:col-span-1">Rank</span>
           <span className="col-span-6 sm:col-span-6">Member & College UID</span>
-          <span className="col-span-4 sm:col-span-3 text-right">K/D Ratio</span>
+          <span className="col-span-4 sm:col-span-3 text-right">CW (Correct/Wrong)</span>
           <span className="hidden sm:block sm:col-span-2 text-right">Points</span>
         </div>
 
@@ -188,7 +184,7 @@ export function LeaderboardView() {
         <div className="divide-y-[2px] divide-[var(--ink)]">
           {filteredUsers.length === 0 ? (
             <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">
-              No participants found matching &quot;{searchQuery}&quot;
+              {searchQuery ? `No participants found matching "${searchQuery}".` : 'No participants on the leaderboard yet.'}
             </div>
           ) : (
             filteredUsers.map((player) => (
@@ -207,7 +203,7 @@ export function LeaderboardView() {
 
                 {/* Name & UID */}
                 <div className="col-span-6 sm:col-span-6 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] flex items-center justify-center text-xs font-black shrink-0">
+                  <div className="w-8 h-8 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] flex items-center justify-center text-xs font-black shrink-0 text-[var(--ink)]">
                     {player.name.charAt(0)}
                   </div>
                   <div>
@@ -220,10 +216,10 @@ export function LeaderboardView() {
                   </div>
                 </div>
 
-                {/* K/D Ratio */}
+                {/* CW Ratio */}
                 <div className="col-span-4 sm:col-span-3 text-right">
                   <div className="font-mono font-black text-sm text-[var(--ink)]">
-                    {player.kdRatio.toFixed(2)}
+                    {player.cwRatio.toFixed(2)} CW
                   </div>
                   <div className="text-[10px] font-mono font-bold text-[var(--text-muted)]">
                     {player.correctCount}C / {player.wrongCount}W

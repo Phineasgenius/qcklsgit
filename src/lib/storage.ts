@@ -79,15 +79,15 @@ const DEFAULT_QUESTIONS: Question[] = [
     id: 'q-1',
     edition: 42,
     title: 'The Belagavi Accord',
-    questionText: 'In December 1924, this landmark political assembly convened right here in Belagavi (Belgaum), notable for being the only Congress session ever presided over by a singular iconic figure in modern Indian history. Give the funda: Who was this historical president or what was this session?',
+    questionText: 'In December 1924, this landmark political assembly convened right here in Belagavi (Belgaum), notable for being the only Congress session ever presided over by a singular iconic figure in modern Indian history. Who was this historical president or what was this session?',
     hints: {
       difficult: 'The temporary venue of this 39th session was famously christened Vijayanagar in tribute to the great southern empire.',
       medium: 'A revered memorial well named "Veera Soudha" with a memorial pylon still stands in Tilakwadi, Belagavi, to commemorate this exact meeting.',
       easy: 'The statesman who presided over this historic session is fondly known throughout the world as the Father of the Nation.',
     },
     answer: 'Mahatma Gandhi (1924 Belgaum Congress Session)',
+    funda: 'Belgaum Congress Session / Gandhi only presidency',
     fundaKeywords: ['mahatma', 'gandhi', 'belgaum', 'congress', '1924', 'veera soudha', 'president'],
-    isFunda: true,
     status: 'active',
     date: new Date().toISOString().split('T')[0],
     createdAt: new Date().toISOString(),
@@ -96,15 +96,15 @@ const DEFAULT_QUESTIONS: Question[] = [
     id: 'q-2',
     edition: 43,
     title: 'The Quantum Feline',
-    questionText: 'Give the funda: In 1935, an Austrian-Irish theoretical physicist formulated a renowned paradox to illustrate the bizarre nature of quantum superposition, featuring a sealed steel chamber, a vial of hydrocyanic poison, a Geiger counter, and a domestic animal. What is this famous thought experiment?',
+    questionText: 'In 1935, an Austrian-Irish theoretical physicist formulated a renowned paradox to illustrate the bizarre nature of quantum superposition, featuring a sealed steel chamber, a vial of hydrocyanic poison, a Geiger counter, and a domestic animal. What is this famous thought experiment or concept?',
     hints: {
       difficult: 'It was devised in an exchange of letters with Albert Einstein to critique the orthodoxy of the Copenhagen interpretation.',
       medium: 'According to the paradox, the entity enclosed in the chamber remains simultaneously alive and dead until the chamber is unsealed.',
       easy: 'It is named after the physicist whose eponymous wave equation revolutionized quantum mechanics.',
     },
     answer: "Schrödinger's Cat (Quantum Superposition)",
+    funda: 'Quantum Superposition / Copenhagen Paradox',
     fundaKeywords: ['schrodinger', 'cat', 'superposition', 'quantum', 'copenhagen'],
-    isFunda: true,
     status: 'draft',
     date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     createdAt: new Date().toISOString(),
@@ -120,8 +120,8 @@ const DEFAULT_QUESTIONS: Question[] = [
       easy: 'The cryptographic cipher machine being cracked was named Enigma, and the estate was Bletchley Park.',
     },
     answer: 'Bletchley Park / Enigma Machine',
+    funda: 'Enigma Codebreaking / Alan Turing Bombe',
     fundaKeywords: ['bletchley', 'park', 'enigma', 'alan turing', 'bombe'],
-    isFunda: true,
     status: 'draft',
     date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
     createdAt: new Date().toISOString(),
@@ -254,7 +254,21 @@ export function recordSubmission(submission: Submission) {
   }
 }
 
-export function getLeaderboard(): (User & { kdRatio: number; rank: number })[] {
+export function deleteUser(userId: string) {
+  if (!isClient) return;
+  try {
+    const users = getStoredUsers().filter(u => u.id !== userId);
+    saveStoredUsers(users);
+
+    // Also remove user's submissions
+    const submissions = getStoredSubmissions().filter(s => s.userId !== userId);
+    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(submissions));
+  } catch (err) {
+    console.error('Failed deleting user:', err);
+  }
+}
+
+export function getLeaderboard(): (User & { cwRatio: number; rank: number })[] {
   const users = getStoredUsers().filter(u => u.role === 'user');
   
   const sorted = [...users].sort((a, b) => {
@@ -263,12 +277,12 @@ export function getLeaderboard(): (User & { kdRatio: number; rank: number })[] {
   });
 
   return sorted.map((user, idx) => {
-    const kdRatio = user.wrongCount === 0 
+    const cwRatio = user.wrongCount === 0 
       ? user.correctCount 
       : Number((user.correctCount / user.wrongCount).toFixed(2));
     return {
       ...user,
-      kdRatio,
+      cwRatio,
       rank: idx + 1,
     };
   });

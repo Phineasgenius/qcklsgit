@@ -25,7 +25,7 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
                 Rules & Scoring
               </h3>
               <p className="text-xs text-[var(--text-secondary)] font-medium">
-                Quiz Club KLS GIT Daily Trivia Engine
+                Quiz Club KLS GIT Daily Trivia
               </p>
             </div>
           </div>
@@ -65,25 +65,25 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
             </div>
           </div>
 
-          {/* Funda Questions */}
+          {/* Expected Funda */}
           <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--lilac)]/25 shadow-[2px_2px_0_var(--ink)] space-y-1">
             <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>&quot;Give Funda&quot; Fuzzy Matching</span>
+              <span>Expected Funda Acceptance</span>
             </h4>
             <p className="text-xs text-[var(--ink)]">
-              For conceptual & funda questions, the system checks for close enough answers, key conceptual keywords, and spelling typos rather than a strict rigid string match!
+              For any question, if you provide the underlying expected &quot;funda&quot; (the connecting theme, concept, or historical connect), the system evaluates and accepts it as correct!
             </p>
           </div>
 
-          {/* K/D Ratio */}
+          {/* CW Ratio */}
           <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[2px_2px_0_var(--ink)] space-y-1">
             <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
               <Crosshair className="w-3.5 h-3.5" />
-              <span>Leaderboard K/D Ratio</span>
+              <span>Leaderboard CW (Correct/Wrong) Ratio</span>
             </h4>
             <p className="text-xs text-[var(--ink)]">
-              Your profile tracks a <strong>K/D Ratio (Correct ÷ Wrong attempts)</strong> like gaming leaderboards. Accuracy matters alongside raw points!
+              The leaderboard tracks your <strong>CW Ratio (Correct Answers ÷ Wrong Attempts)</strong> alongside raw points, rewarding precision!
             </p>
           </div>
         </div>

@@ -1,11 +1,11 @@
-// Smart fuzzy matching engine for Quiz Club KLS GIT
-// Specifically handles "give funda" questions with conceptual & typo tolerance
+// Smart matching engine for Quiz Club KLS GIT
+// Checks for both canonical answer and expected "funda" / connecting concept
 
 export interface MatchResult {
   isMatch: boolean;
-  confidence: number; // 0 to 1
+  confidence: number;
   reason: string;
-  isCloseEnough: boolean;
+  isFundaMatch: boolean;
 }
 
 const STOP_WORDS = new Set([
@@ -13,25 +13,18 @@ const STOP_WORDS = new Set([
   'is', 'it', 'was', 'are', 'that', 'this', 'its', 'from', 'as', 'into', 'about'
 ]);
 
-/**
- * Clean and normalize text:
- * lowercase, remove diacritics, strip punctuation, normalize spaces
- */
 export function normalizeText(text: string): string {
   if (!text) return '';
   return text
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/['"’“”]/g, '')         // remove quotes
-    .replace(/[^a-z0-9\s]/g, ' ')   // replace non-alphanumeric with spaces
-    .replace(/\s+/g, ' ')           // collapse whitespace
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['"’“”]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-/**
- * Extract meaningful semantic tokens (excluding common filler words)
- */
 export function extractTokens(text: string): string[] {
   const normalized = normalizeText(text);
   if (!normalized) return [];
@@ -40,9 +33,6 @@ export function extractTokens(text: string): string[] {
   return filtered.length > 0 ? filtered : tokens;
 }
 
-/**
- * Compute Levenshtein distance between two strings
- */
 export function levenshteinDistance(s1: string, s2: string): number {
   const m = s1.length;
   const n = s2.length;
@@ -58,9 +48,9 @@ export function levenshteinDistance(s1: string, s2: string): number {
     for (let j = 1; j <= n; j++) {
       const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
       dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,       // deletion
-        dp[i][j - 1] + 1,       // insertion
-        dp[i - 1][j - 1] + cost // substitution
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
       );
     }
   }
@@ -68,9 +58,6 @@ export function levenshteinDistance(s1: string, s2: string): number {
   return dp[m][n];
 }
 
-/**
- * Calculate similarity between 0 and 1 based on Levenshtein distance
- */
 export function stringSimilarity(s1: string, s2: string): number {
   if (s1 === s2) return 1;
   const maxLen = Math.max(s1.length, s2.length);
@@ -79,9 +66,6 @@ export function stringSimilarity(s1: string, s2: string): number {
   return Math.max(0, 1 - dist / maxLen);
 }
 
-/**
- * Token Overlap (Sørensen-Dice Coefficient) between token sets
- */
 export function tokenDiceCoefficient(tokensA: string[], tokensB: string[]): number {
   if (tokensA.length === 0 || tokensB.length === 0) return 0;
   const setA = new Set(tokensA);
@@ -92,7 +76,6 @@ export function tokenDiceCoefficient(tokensA: string[], tokensB: string[]): numb
     if (setB.has(tokenA)) {
       matches++;
     } else {
-      // Allow minor typo in tokens (e.g. 1 char typo)
       for (const tokenB of setB) {
         if (stringSimilarity(tokenA, tokenB) >= 0.82) {
           matches += 0.9;
@@ -106,24 +89,24 @@ export function tokenDiceCoefficient(tokensA: string[], tokensB: string[]): numb
 }
 
 /**
- * Evaluates participant guess against question answer and funda keywords
+ * Checks participant answer against canonical answer and expected funda
  */
 export function checkAnswer(
   guess: string,
   canonicalAnswer: string,
-  fundaKeywords: string[] = [],
-  isFunda: boolean = false
+  fundaText?: string,
+  fundaKeywords: string[] = []
 ): MatchResult {
   const normGuess = normalizeText(guess);
   const normAnswer = normalizeText(canonicalAnswer);
 
   if (!normGuess) {
-    return { isMatch: false, confidence: 0, reason: 'Answer cannot be empty.', isCloseEnough: false };
+    return { isMatch: false, confidence: 0, reason: 'Answer cannot be empty.', isFundaMatch: false };
   }
 
-  // 1. Direct exact match
+  // 1. Direct match with canonical answer
   if (normGuess === normAnswer) {
-    return { isMatch: true, confidence: 1.0, reason: 'Spot on! Exact match.', isCloseEnough: false };
+    return { isMatch: true, confidence: 1.0, reason: 'Spot on! Correct answer.', isFundaMatch: false };
   }
 
   // 2. Direct string similarity (handles typos)
@@ -132,108 +115,93 @@ export function checkAnswer(
     return {
       isMatch: true,
       confidence: directSim,
-      reason: directSim >= 0.95 ? 'Spot on!' : 'Close enough! Accepted typo/spelling variation.',
-      isCloseEnough: directSim < 0.95
+      reason: directSim >= 0.95 ? 'Spot on!' : 'Close enough! Spelling accepted.',
+      isFundaMatch: false
     };
   }
 
-  // 3. Substring inclusion (e.g. user typed full name or main title)
+  // 3. Substring match
   if (normAnswer.length > 3 && (normGuess.includes(normAnswer) || normAnswer.includes(normGuess))) {
     const minLen = Math.min(normGuess.length, normAnswer.length);
     const maxLen = Math.max(normGuess.length, normAnswer.length);
-    const lengthRatio = minLen / maxLen;
-    if (lengthRatio >= 0.55) {
+    if (minLen / maxLen >= 0.5) {
       return {
         isMatch: true,
-        confidence: 0.85 * lengthRatio + 0.15,
-        reason: 'Close enough! Substring/title match acknowledged.',
-        isCloseEnough: true
+        confidence: 0.9,
+        reason: 'Correct! Main answer captured.',
+        isFundaMatch: false
       };
     }
   }
 
-  // 4. Token Overlap check
+  // 4. Token Overlap check on canonical answer
   const guessTokens = extractTokens(normGuess);
   const answerTokens = extractTokens(normAnswer);
   const diceSim = tokenDiceCoefficient(guessTokens, answerTokens);
 
-  if (diceSim >= 0.72) {
+  if (diceSim >= 0.70) {
     return {
       isMatch: true,
       confidence: diceSim,
-      reason: 'Close enough! Key concepts and words aligned.',
-      isCloseEnough: true
+      reason: 'Correct! Core answer captured.',
+      isFundaMatch: false
     };
   }
 
-  // 5. "Give Funda" conceptual matching
-  // If question is marked as "give funda" or funda keywords are provided
-  if (isFunda || fundaKeywords.length > 0) {
-    // Normalise all accepted funda keywords / alternative phrases
-    const cleanKeywords = fundaKeywords
-      .map(k => normalizeText(k))
-      .filter(k => k.length > 0);
+  // 5. Expected Funda Matching
+  // If the student gave the funda (expected concept/theme/connection)
+  const allFundaPhrases: string[] = [];
+  if (fundaText) {
+    allFundaPhrases.push(fundaText);
+    allFundaPhrases.push(...fundaText.split(/[,;/|]/));
+  }
+  if (fundaKeywords && fundaKeywords.length > 0) {
+    allFundaPhrases.push(...fundaKeywords);
+  }
 
-    let matchedKeywordCount = 0;
-    for (const keyword of cleanKeywords) {
-      // Check if keyword is in guess
-      if (normGuess.includes(keyword)) {
-        matchedKeywordCount++;
-      } else {
-        // Token check
-        const kwTokens = extractTokens(keyword);
-        const kwDice = tokenDiceCoefficient(guessTokens, kwTokens);
-        if (kwDice >= 0.7) {
-          matchedKeywordCount++;
-        }
-      }
-    }
+  const cleanFundaPhrases = allFundaPhrases
+    .map(p => normalizeText(p))
+    .filter(p => p.length > 1);
 
-    if (cleanKeywords.length > 0 && matchedKeywordCount >= Math.min(2, cleanKeywords.length)) {
+  for (const phrase of cleanFundaPhrases) {
+    // Check if guess contains the funda phrase or vice versa
+    if (normGuess.includes(phrase) || (phrase.length > 3 && phrase.includes(normGuess))) {
       return {
         isMatch: true,
-        confidence: 0.88,
-        reason: `Funda cracked! Matched essential concepts (${matchedKeywordCount} of ${cleanKeywords.length} funda markers).`,
-        isCloseEnough: true
+        confidence: 0.92,
+        reason: 'Accepted! You cracked the expected funda of the question.',
+        isFundaMatch: true
       };
     }
 
-    // Also check semicolon/comma split alternative answers in canonicalAnswer
-    // E.g. QM may write "Schrödinger's Cat; Superposition; Copenhagen Interpretation"
-    const splitAlternatives = canonicalAnswer
-      .split(/[,;/|]/)
-      .map(a => normalizeText(a))
-      .filter(a => a.length > 0);
+    // Similarity with funda phrase
+    if (stringSimilarity(normGuess, phrase) >= 0.82) {
+      return {
+        isMatch: true,
+        confidence: 0.88,
+        reason: 'Accepted! Funda concept matched.',
+        isFundaMatch: true
+      };
+    }
 
-    for (const alt of splitAlternatives) {
-      const altSim = stringSimilarity(normGuess, alt);
-      if (altSim >= 0.80) {
-        return {
-          isMatch: true,
-          confidence: altSim,
-          reason: 'Funda accepted! Matched acceptable alternative answer.',
-          isCloseEnough: true
-        };
-      }
-      const altTokens = extractTokens(alt);
-      const altDice = tokenDiceCoefficient(guessTokens, altTokens);
-      if (altDice >= 0.70) {
-        return {
-          isMatch: true,
-          confidence: altDice,
-          reason: 'Funda accepted! Conceptual answer captured.',
-          isCloseEnough: true
-        };
-      }
+    // Token check on funda
+    const phraseTokens = extractTokens(phrase);
+    if (tokenDiceCoefficient(guessTokens, phraseTokens) >= 0.70) {
+      return {
+        isMatch: true,
+        confidence: 0.86,
+        reason: 'Accepted! Expected funda concept captured.',
+        isFundaMatch: true
+      };
     }
   }
 
-  // If not matched, provide encouraging feedback
-  const maxScore = Math.max(directSim, diceSim);
+  // If not matched
+  const maxConfidence = Math.max(directSim, diceSim);
   return {
     isMatch: false,
-    confidence: maxScore,
-    reason: maxScore > 0.5 ? 'Very close, but missing the key link. Try another angle!' : 'Not quite. Check the clues or try another guess!',
-    isCloseEnough: false
+    confidence: maxConfidence,
+    reason: maxConfidence > 0.5 ? 'Very close, but missing the key connect. Try again!' : 'Incorrect. Check clues or try another guess.',
+    isFundaMatch: false
   };
 }

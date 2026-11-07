@@ -1,18 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import Image from 'next/image';
 import { 
-  Trophy, 
   HelpCircle, 
   User as UserIcon, 
   ShieldCheck, 
   Sun, 
   Moon, 
   LogOut,
-  Brain,
-  ListOrdered
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -30,30 +30,41 @@ export function Header({
   onOpenAuth,
   onOpenQMConsole,
 }: HeaderProps) {
-  const { currentUser, isQM, logout } = useAuth();
+  const { currentUser, isQM, logout, deleteMyAccount } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDeleteUserAccount = () => {
+    deleteMyAccount();
+    setShowDeleteConfirm(false);
+  };
 
   return (
     <header className="border-b-[2.5px] border-[var(--ink)] pb-6 mb-8">
       <div className="flex flex-col md:flex-row items-center justify-between gap-5">
-        {/* Brand Group */}
+        {/* Brand Group with Official QC KLS GIT Logo */}
         <div className="flex items-center gap-3.5 text-center md:text-left">
-          <div 
-            className="w-13 h-13 p-3 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--yellow)] flex items-center justify-center shadow-[3px_3px_0_var(--ink)] shrink-0"
-          >
-            <Brain className="w-7 h-7 text-[var(--ink)] stroke-[2.5]" />
+          <div className="relative w-14 h-14 rounded-full border-[2.5px] border-[var(--ink)] bg-white overflow-hidden shadow-[3px_3px_0_var(--ink)] shrink-0">
+            <Image
+              src="/logo.png"
+              alt="Quiz Club KLS GIT Logo"
+              width={56}
+              height={56}
+              className="object-cover w-full h-full"
+              priority
+            />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ink)]">
                 Quiz Club KLS GIT
               </h1>
-              <span className="text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
-                QCKLSGIT
+              <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
+                QC
               </span>
             </div>
             <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">
-              Karnatak Law Society&apos;s Gogte Institute of Technology • Question of the Day
+              Question of the Day & Live Leaderboard
             </p>
           </div>
         </div>
@@ -94,7 +105,7 @@ export function Header({
             <span className="hidden sm:inline">Rules</span>
           </button>
 
-          {/* Quizmaster Link */}
+          {/* Quizmaster Link (No credentials shown!) */}
           {isQM ? (
             <button
               onClick={onOpenQMConsole}
@@ -107,7 +118,7 @@ export function Header({
             <button
               onClick={onOpenQMConsole}
               className="btn-neo btn-neo-secondary !py-1.5 !px-3 text-xs"
-              title="Quizmaster Access"
+              title="Quizmaster Portal"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-[var(--red)]" />
               <span className="hidden sm:inline">QM Portal</span>
@@ -130,9 +141,7 @@ export function Header({
           {/* User Sign In / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1.5">
-              <div 
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)] text-xs font-bold"
-              >
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)] text-xs font-bold">
                 <div className="w-5 h-5 rounded-full bg-[var(--yellow)] border border-[var(--ink)] flex items-center justify-center text-[10px]">
                   {currentUser.name.charAt(0).toUpperCase()}
                 </div>
@@ -140,17 +149,32 @@ export function Header({
                   <span className="leading-tight text-[11px] truncate max-w-[100px]">{currentUser.name}</span>
                   <span className="text-[9px] text-[var(--text-muted)] font-mono leading-none">{currentUser.uid}</span>
                 </div>
-                <span className="px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)] font-mono text-[10px]">
-                  {currentUser.points}★
-                </span>
+                {currentUser.role === 'user' && (
+                  <span className="px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)] font-mono text-[10px]">
+                    {currentUser.points}★
+                  </span>
+                )}
               </div>
+
+              {/* Logout button */}
               <button
                 onClick={logout}
                 title="Sign out"
-                className="btn-neo btn-neo-secondary !p-1.5 rounded-full text-[var(--red)]"
+                className="btn-neo btn-neo-secondary !p-1.5 rounded-full"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3.5 h-3.5 text-[var(--ink)]" />
               </button>
+
+              {/* Delete User Account Button (for students) */}
+              {currentUser.role === 'user' && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  title="Delete my account"
+                  className="btn-neo btn-neo-secondary !p-1.5 rounded-full text-[var(--red)]"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ) : (
             <button
@@ -163,6 +187,37 @@ export function Header({
           )}
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal for User */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="card-neo w-full max-w-md p-6 bg-[var(--bg-secondary)] space-y-4">
+            <div className="flex items-center gap-2 text-[var(--red)]">
+              <AlertTriangle className="w-6 h-6 stroke-[2.5]" />
+              <h3 className="text-lg font-black text-[var(--ink)]">
+                Delete Your Account?
+              </h3>
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
+              This will permanently delete your account, your UID record (<strong>{currentUser?.uid}</strong>), and all your quiz scores and submissions from the leaderboard. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="btn-neo btn-neo-secondary text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUserAccount}
+                className="btn-neo btn-neo-primary text-xs"
+              >
+                Yes, Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
