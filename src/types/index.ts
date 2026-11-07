@@ -18,7 +18,7 @@ export interface HintConfig {
   tier: HintTier;
   label: string;
   text: string;
-  maxPointsIfUsed: number; // 90 for difficult, 70 for medium, 50 for easy
+  maxPointsIfUsed: number;
 }
 
 export interface Question {
@@ -27,12 +27,12 @@ export interface Question {
   title: string;
   questionText: string;
   hints: {
-    difficult?: string; // 1st hint (Toughest) -> gives 90 pts
-    medium?: string;    // 2nd hint (Medium) -> gives 70 pts
-    easy?: string;      // 3rd hint (Easiest) -> gives 50 pts
+    difficult?: string;
+    medium?: string;
+    easy?: string;
   };
   answer: string;
-  fundaKeywords?: string[]; // Keywords for "give funda" checking
+  fundaKeywords?: string[];
   isFunda: boolean;
   status: 'draft' | 'active' | 'archived';
   date: string;
@@ -49,11 +49,7 @@ export interface Submission {
   hintsUnlocked: HintTier[];
   pointsAwarded: number;
   isCorrect: boolean;
-  matchScore: number; // 0 to 1 confidence
+  matchScore: number;
   matchFeedback?: string;
   timestamp: string;
 }
-
-export type ThemeMode = 'morning' | 'golden' | 'dusk' | 'midnight';
-export type MotionSpeed = 'calm' | 'breeze' | 'gale';
-export type CompanionType = 'cat' | 'dog' | 'owl' | 'none';

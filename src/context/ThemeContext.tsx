@@ -1,90 +1,39 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ThemeMode, MotionSpeed, CompanionType } from '@/types';
 
 interface ThemeContextType {
-  theme: ThemeMode;
-  setTheme: (t: ThemeMode) => void;
-  motion: MotionSpeed;
-  setMotion: (m: MotionSpeed) => void;
-  companion: CompanionType;
-  setCompanion: (c: CompanionType) => void;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
   isDark: boolean;
 }
-
-const THEME_KEY = 'qcklsgit_theme_mode';
-const MOTION_KEY = 'qcklsgit_motion_mode';
-const COMPANION_KEY = 'qcklsgit_companion_mode';
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>('midnight');
-  const [motion, setMotionState] = useState<MotionSpeed>('breeze');
-  const [companion, setCompanionState] = useState<CompanionType>('cat');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     try {
-      const savedTheme = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-      if (savedTheme) setThemeState(savedTheme);
-
-      const savedMotion = localStorage.getItem(MOTION_KEY) as MotionSpeed | null;
-      if (savedMotion) setMotionState(savedMotion);
-
-      const savedCompanion = localStorage.getItem(COMPANION_KEY) as CompanionType | null;
-      if (savedCompanion) setCompanionState(savedCompanion);
+      const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
+      const initial = saved || 'light';
+      setTheme(initial);
+      document.documentElement.setAttribute('data-theme', initial);
     } catch (e) {
       console.error(e);
     }
   }, []);
 
-  const setTheme = (t: ThemeMode) => {
-    setThemeState(t);
-    localStorage.setItem(THEME_KEY, t);
-    // Apply dark class to html document
-    if (t === 'dusk' || t === 'midnight') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    localStorage.setItem('theme', next);
+    document.documentElement.setAttribute('data-theme', next);
   };
-
-  const setMotion = (m: MotionSpeed) => {
-    setMotionState(m);
-    localStorage.setItem(MOTION_KEY, m);
-  };
-
-  const setCompanion = (c: CompanionType) => {
-    setCompanionState(c);
-    localStorage.setItem(COMPANION_KEY, c);
-  };
-
-  useEffect(() => {
-    if (theme === 'dusk' || theme === 'midnight') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const isDark = theme === 'dusk' || theme === 'midnight';
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, motion, setMotion, companion, setCompanion, isDark }}>
-      <div 
-        className={`min-h-screen transition-colors duration-500 ${
-          theme === 'morning'
-            ? 'bg-[#faf8f5] text-[#2c2c2c]'
-            : theme === 'golden'
-            ? 'bg-[#fef7ee] text-[#2d241e]'
-            : theme === 'dusk'
-            ? 'bg-[#181b2a] text-[#f1f5f9]'
-            : 'bg-[#121212] text-[#f4f4f5]'
-        }`}
-      >
-        {children}
-      </div>
+    <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === 'dark' }}>
+      {children}
     </ThemeContext.Provider>
   );
 }

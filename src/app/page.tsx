@@ -2,33 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
-import { AtmosphereBar } from '@/components/AtmosphereBar';
 import { QuestionCard } from '@/components/QuestionCard';
-import { CompanionWidget } from '@/components/CompanionWidget';
-import { LeaderboardModal } from '@/components/LeaderboardModal';
+import { LeaderboardView } from '@/components/LeaderboardView';
 import { HowToPlayModal } from '@/components/HowToPlayModal';
 import { AuthModal } from '@/components/AuthModal';
 import { QuizmasterDashboard } from '@/components/QuizmasterDashboard';
 import { ShareModal } from '@/components/ShareModal';
-import { getActiveQuestion, getStoredQuestions } from '@/lib/storage';
+import { getActiveQuestion } from '@/lib/storage';
 import { Question, HintTier } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { Sparkles, Trophy, BookOpen, Compass } from 'lucide-react';
 
 export default function HomePage() {
   const { isQM, currentUser } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<'quiz' | 'leaderboard'>('quiz');
   const [question, setQuestion] = useState<Question>(() => getActiveQuestion());
-  const [companionMsg, setCompanionMsg] = useState<string>('');
-  
-  // Modals state
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+
+  // Modal states
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isQMConsoleOpen, setIsQMConsoleOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
-  // Solved details for share card
+  // Share card details
   const [sharePoints, setSharePoints] = useState(100);
   const [shareHints, setShareHints] = useState<HintTier[]>([]);
 
@@ -48,84 +44,79 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenShare = (points: number, hints: HintTier[]) => {
+    setSharePoints(points);
+    setShareHints(hints);
+    setIsShareOpen(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col justify-between">
-      <div>
-        {/* Top Header */}
+      <div className="max-w-4xl mx-auto px-4 py-6 md:py-10 w-full">
+        {/* Crisp Masthead Header */}
         <Header
-          editionNumber={question.edition}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           onOpenHowToPlay={() => setIsHowToPlayOpen(true)}
-          onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
           onOpenQMConsole={handleOpenQM}
         />
 
-        {/* Atmosphere & Customization Bar */}
-        <AtmosphereBar />
-
-        {/* Main Content Workspace */}
-        <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
-          {/* Welcome ribbon if user is logged in */}
-          {currentUser && (
-            <div className="mb-6 flex items-center justify-between text-xs px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25">
-              <div className="flex items-center gap-2">
-                <span className="text-amber-500 font-bold">● Active Session:</span>
-                <span>{currentUser.name}</span>
-                <span className="font-mono opacity-70">({currentUser.uid})</span>
-              </div>
-              <div className="flex items-center gap-3 font-mono font-semibold">
-                <span className="text-amber-500">{currentUser.points} ★ Points</span>
-                <span className="opacity-40">•</span>
-                <span>K/D: {currentUser.wrongCount === 0 ? currentUser.correctCount : (currentUser.correctCount / currentUser.wrongCount).toFixed(2)}</span>
-              </div>
+        {/* Member Status Pill if logged in */}
+        {currentUser && (
+          <div className="mb-6 p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[3px_3px_0_var(--ink)] flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--teal)] border border-[var(--ink)]" />
+              <span className="font-extrabold text-[var(--ink)]">Signed in as {currentUser.name}</span>
+              <span className="font-mono text-[var(--red)] font-bold">({currentUser.uid})</span>
             </div>
-          )}
+            <div className="flex items-center gap-3 font-mono font-bold">
+              <span className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)]">
+                {currentUser.points} ★ Points
+              </span>
+              <span className="text-[var(--text-secondary)]">
+                K/D: {currentUser.wrongCount === 0 ? currentUser.correctCount : (currentUser.correctCount / currentUser.wrongCount).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
 
-          {/* Core Question Card */}
-          <QuestionCard
-            question={question}
-            onOpenShareModal={() => setIsShareOpen(true)}
-            onCompanionMessage={(msg) => {
-              setCompanionMsg(msg);
-              setTimeout(() => setCompanionMsg(''), 6000);
-            }}
-          />
+        {/* Content Tabs */}
+        <main className="w-full">
+          {activeTab === 'quiz' ? (
+            <QuestionCard
+              question={question}
+              onOpenShareModal={handleOpenShare}
+            />
+          ) : (
+            <LeaderboardView />
+          )}
         </main>
       </div>
 
-      {/* Editorial Footer */}
-      <footer className="w-full border-t border-stone-200 dark:border-[#22283a] py-6 px-4 text-center text-xs opacity-75">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-serif">
-          <div className="flex items-center gap-2">
-            <span className="font-bold">Quiz Club KLS GIT</span>
-            <span>•</span>
-            <span className="italic">KLS Gogte Institute of Technology, Udyambag, Belagavi</span>
+      {/* Crisp Neobrutalist Footer */}
+      <footer className="w-full border-t-[2.5px] border-[var(--ink)] bg-[var(--paper-deep)] py-6 px-4 text-xs font-semibold mt-12">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="text-[var(--ink)]">
+            <strong>Quiz Club KLS GIT</strong> • Karnatak Law Society&apos;s Gogte Institute of Technology, Belagavi
           </div>
-          <div className="flex items-center gap-3 text-[11px] font-sans">
-            <button onClick={() => setIsHowToPlayOpen(true)} className="hover:underline">
-              How to Play
+          <div className="flex items-center gap-3 text-[var(--text-secondary)]">
+            <button onClick={() => setActiveTab('quiz')} className="hover:text-[var(--ink)] hover:underline">
+              Today&apos;s Quiz
             </button>
             <span>•</span>
-            <button onClick={() => setIsLeaderboardOpen(true)} className="hover:underline">
+            <button onClick={() => setActiveTab('leaderboard')} className="hover:text-[var(--ink)] hover:underline">
               Leaderboard
             </button>
             <span>•</span>
-            <button onClick={handleOpenQM} className="hover:underline">
-              Quizmaster Portal
+            <button onClick={handleOpenQM} className="hover:text-[var(--ink)] hover:underline">
+              QM Portal
             </button>
           </div>
         </div>
       </footer>
 
-      {/* Interactive Companion Pet */}
-      <CompanionWidget statusMessage={companionMsg} />
-
       {/* Modals */}
-      <LeaderboardModal
-        isOpen={isLeaderboardOpen}
-        onClose={() => setIsLeaderboardOpen(false)}
-      />
-
       <HowToPlayModal
         isOpen={isHowToPlayOpen}
         onClose={() => setIsHowToPlayOpen(false)}
@@ -145,6 +136,7 @@ export default function HomePage() {
         onClose={() => setIsQMConsoleOpen(false)}
         onQuestionActivated={() => {
           refreshActiveQuestion();
+          setActiveTab('quiz');
         }}
       />
 
