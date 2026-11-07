@@ -310,7 +310,8 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
                   setGuess(e.target.value);
                   if (emptyError) setEmptyError('');
                 }}
-                className="w-full px-4 py-3.5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--bg-secondary)] text-[var(--ink)] text-sm font-semibold shadow-[4px_4px_0_var(--ink)] focus:outline-none focus:translate-x-[-1px] focus:translate-y-[-1px] focus:shadow-[6px_6px_0_var(--ink)] transition-all"
+                placeholder="Type your answer or funda..."
+                className="w-full px-4 py-3.5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--bg-secondary)] text-[var(--ink)] text-sm font-semibold shadow-[4px_4px_0_var(--ink)] focus:outline-none focus:translate-x-[-1px] focus:translate-y-[-1px] focus:shadow-[6px_6px_0_var(--ink)] transition-all placeholder:text-[var(--text-muted)] placeholder:font-normal"
               />
             </div>
 

@@ -188,7 +188,8 @@ export function AuthModal({
                 type="text"
                 value={userUid}
                 onChange={(e) => setUserUid(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter college UID"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:font-sans placeholder:font-normal"
               />
             </div>
             <div className="space-y-1">
@@ -199,7 +200,8 @@ export function AuthModal({
                 type="password"
                 value={userPass}
                 onChange={(e) => setUserPass(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter password"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)]"
               />
             </div>
             <button
@@ -222,7 +224,8 @@ export function AuthModal({
                 type="text"
                 value={regName}
                 onChange={(e) => setRegName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm font-semibold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter your full name"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm font-semibold shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)]"
               />
             </div>
             <div className="space-y-1">
@@ -233,7 +236,8 @@ export function AuthModal({
                 type="text"
                 value={regUid}
                 onChange={(e) => setRegUid(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter college UID"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:font-sans placeholder:font-normal"
               />
             </div>
             <div className="space-y-1">
@@ -244,7 +248,8 @@ export function AuthModal({
                 type="password"
                 value={regPass}
                 onChange={(e) => setRegPass(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Create password"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)]"
               />
             </div>
             <button
@@ -267,7 +272,8 @@ export function AuthModal({
                 type="text"
                 value={qmUser}
                 onChange={(e) => setQmUser(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter username"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] font-mono text-sm font-bold shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:font-sans placeholder:font-normal"
               />
             </div>
             <div className="space-y-1">
@@ -278,7 +284,8 @@ export function AuthModal({
                 type="password"
                 value={qmPass}
                 onChange={(e) => setQmPass(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none"
+                placeholder="Enter password"
+                className="w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)]"
               />
             </div>
             <button

@@ -61,7 +61,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col justify-between">
-      <div className="max-w-4xl mx-auto px-4 py-6 md:py-10 w-full">
+      <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 transition-all">
         {/* Crisp Masthead Header with Official Logo */}
         <Header
           activeTab={activeTab}

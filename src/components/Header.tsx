@@ -40,37 +40,37 @@ export function Header({
   };
 
   return (
-    <header className="border-b-[2.5px] border-[var(--ink)] pb-6 mb-8">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-5">
-        {/* Brand Group with Official QC KLS GIT Logo */}
-        <div className="flex items-center gap-3.5 text-center md:text-left">
-          <div className="relative w-14 h-14 rounded-full border-[2.5px] border-[var(--ink)] bg-white overflow-hidden shadow-[3px_3px_0_var(--ink)] shrink-0">
+    <header className="border-b-[2.5px] border-[var(--ink)] pb-5 sm:pb-6 mb-6 sm:mb-8 w-full">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 lg:gap-6 w-full">
+        {/* Brand Group with Fluid Typography & Flexible Logo */}
+        <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left justify-center sm:justify-start min-w-0">
+          <div className="relative w-[clamp(44px,5vw,58px)] h-[clamp(44px,5vw,58px)] rounded-full border-[2.5px] border-[var(--ink)] bg-white overflow-hidden shadow-[3px_3px_0_var(--ink)] shrink-0 transition-transform">
             <Image
               src="/logo.png"
               alt="Quiz Club KLS GIT Logo"
-              width={56}
-              height={56}
+              width={60}
+              height={60}
               className="object-cover w-full h-full"
               priority
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ink)]">
+          <div className="min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+              <h1 className="text-[clamp(1.25rem,2.5vw,1.95rem)] font-black tracking-tight text-[var(--ink)] leading-tight whitespace-normal">
                 Quiz Club KLS GIT
               </h1>
-              <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)]">
+              <span className="text-[clamp(9px,1vw,11px)] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] shrink-0">
                 QC
               </span>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">
+            <p className="text-[clamp(0.7rem,1.2vw,0.825rem)] text-[var(--text-secondary)] font-semibold mt-0.5 leading-snug">
               Question of the Day & Live Leaderboard
             </p>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap justify-center">
+        {/* Action Controls - Fluid & Flexible Wrap */}
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap justify-center lg:justify-end shrink-0">
           {/* Quiz / Leaderboard Tab Switcher */}
           <div className="inline-flex p-1 rounded-full border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)]">
             <button
@@ -105,7 +105,7 @@ export function Header({
             <span className="hidden sm:inline">Rules</span>
           </button>
 
-          {/* Quizmaster Link (No credentials shown!) */}
+          {/* Quizmaster Link */}
           {isQM ? (
             <button
               onClick={onOpenQMConsole}

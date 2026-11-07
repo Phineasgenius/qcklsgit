@@ -137,7 +137,8 @@ export function LeaderboardView() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-full border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-semibold focus:outline-none focus:shadow-[2px_2px_0_var(--ink)]"
+              placeholder="Search by name or UID..."
+              className="w-full pl-10 pr-4 py-2 rounded-full border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-semibold focus:outline-none focus:shadow-[2px_2px_0_var(--ink)] placeholder:text-[var(--text-muted)] placeholder:font-normal"
             />
           </div>
         </div>

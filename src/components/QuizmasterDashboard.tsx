@@ -301,7 +301,8 @@ export function QuizmasterDashboard({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
+                  placeholder="Enter question title"
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
                 />
               </div>
 
@@ -334,7 +335,8 @@ export function QuizmasterDashboard({
                 rows={3}
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
+                placeholder="Enter question prompt"
+                className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
               />
             </div>
 
@@ -347,7 +349,8 @@ export function QuizmasterDashboard({
                 type="text"
                 value={hintDifficult}
                 onChange={(e) => setHintDifficult(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
+                placeholder="Enter toughest clue"
+                className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
               />
             </div>
 
@@ -361,7 +364,8 @@ export function QuizmasterDashboard({
                   type="text"
                   value={hintMedium}
                   onChange={(e) => setHintMedium(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
+                  placeholder="Enter medium clue"
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
             )}
@@ -376,7 +380,8 @@ export function QuizmasterDashboard({
                   type="text"
                   value={hintEasy}
                   onChange={(e) => setHintEasy(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
+                  placeholder="Enter easiest clue"
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
             )}
@@ -390,7 +395,8 @@ export function QuizmasterDashboard({
                   type="text"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
+                  placeholder="Enter correct answer"
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
                 />
               </div>
 
@@ -402,7 +408,8 @@ export function QuizmasterDashboard({
                   type="text"
                   value={funda}
                   onChange={(e) => setFunda(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium"
+                  placeholder="Enter expected funda / concept (optional)"
+                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
             </div>
