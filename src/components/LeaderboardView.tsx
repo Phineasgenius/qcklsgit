@@ -3,81 +3,96 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 import { LeaderboardEntry, LeaderboardResponse } from '@/types';
-import { Crown, Flame } from 'lucide-react';
+import { Award, Target, Flame, Search } from 'lucide-react';
+import styles from './LeaderboardView.module.css';
 
 type Sort = 'points' | 'cw';
 
-function Streak({ n }: { n: number }) {
-  if (n <= 0) return <span className="text-[10px] font-mono font-bold text-[var(--text-muted)]">—</span>;
-  return (
-    <span className="inline-flex items-center gap-0.5 text-[11px] font-mono font-black text-[var(--ink)]" title={`${n}-day streak`}>
-      <Flame className="w-3.5 h-3.5 text-[var(--red)] fill-[var(--red)]" />
-      {n}
-    </span>
-  );
-}
+const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : '3rd');
 
-function Podium({ p, place }: { p: LeaderboardEntry; place: 1 | 2 | 3 }) {
-  const medal = place === 1 ? 'var(--gold)' : place === 2 ? 'var(--silver)' : 'var(--bronze)';
-  const first = place === 1;
+function PodiumCard({ user, rank }: { user: LeaderboardEntry; rank: 1 | 2 | 3 }) {
+  const medal = rank === 1 ? styles.goldMedal : rank === 2 ? styles.silverMedal : styles.bronzeMedal;
   return (
-    <div
-      className={`card-neo card-neo-hover w-full ${first ? 'md:w-[290px] p-6 md:-translate-y-4 order-1 md:order-2' : `md:w-[260px] p-5 ${place === 2 ? 'order-2 md:order-1' : 'order-3'}`} flex flex-col items-center text-center relative bg-[var(--bg-secondary)]`}
-    >
-      <div
-        className={`${first ? 'w-10 h-10 -top-5' : 'w-8 h-8 -top-4'} rounded-full border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute shadow-[2px_2px_0_var(--ink)] text-[#1b1712]`}
-        style={{ background: medal }}
-      >
-        {first ? <Crown className="w-5 h-5 fill-[#1b1712] text-[#1b1712]" /> : place}
+    <div className={`${styles.podiumCard} ${medal} ${rank === 1 ? styles.podiumCardFirst : ''}`}>
+      <div className={styles.podiumBadge}>{ordinal(rank)}</div>
+
+      <div className={styles.podiumAvatar}>{user.name.charAt(0).toUpperCase()}</div>
+
+      <div className={styles.podiumUserInfo}>
+        <h3 className={styles.podiumName}>{user.name}</h3>
+        <span className={styles.podiumUid}>{user.uid}</span>
       </div>
-      <div
-        className={`${first ? 'w-20 h-20 text-3xl' : 'w-16 h-16 text-2xl'} rounded-xl border-[2.5px] bg-[var(--paper-deep)] flex items-center justify-center font-black my-2 text-[var(--ink)]`}
-        style={{ borderColor: medal }}
-      >
-        {p.name.charAt(0)}
+
+      <div className={styles.podiumScoreContainer}>
+        <span className={styles.podiumScoreVal}>{user.points}</span>
+        <span className={styles.podiumScoreLabel}>Points</span>
       </div>
-      <h4 className={`font-extrabold ${first ? 'text-lg' : 'text-base'} text-[var(--ink)] truncate max-w-[220px]`}>{p.name}</h4>
-      <span className="text-xs font-mono font-bold text-[var(--text-muted)]">{p.uid}</span>
-      <div className={`font-mono ${first ? 'text-3xl' : 'text-2xl'} font-black text-[var(--ink)] my-2`}>{p.points} ★</div>
-      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-        {p.cwRatio.toFixed(2)} CW ({p.correctCount}C / {p.wrongCount}W)
-      </span>
-      <div className="mt-2"><Streak n={p.streak} /></div>
+
+      <div className={styles.podiumStats}>
+        <div className={styles.podiumStat}>
+          <span className={styles.statDot} style={{ background: 'var(--teal)' }} />
+          <span>{user.correctCount} C</span>
+        </div>
+        <div className={styles.podiumStat}>
+          <span className={styles.statDot} style={{ background: 'var(--red)' }} />
+          <span>{user.wrongCount} W</span>
+        </div>
+        <div className={styles.podiumStat}>
+          <span className={styles.statDot} style={{ background: 'var(--yellow)' }} />
+          <span>{user.cwRatio.toFixed(2)} CW</span>
+        </div>
+      </div>
+
+      {user.streak > 0 && (
+        <div className={styles.podiumStreak}>
+          <Flame size={13} style={{ color: 'var(--red)', fill: 'var(--red)' }} />
+          <span>Streak: <strong>{user.streak}</strong> {user.streak === 1 ? 'day' : 'days'}</span>
+        </div>
+      )}
     </div>
   );
 }
 
-function Row({ player, highlight }: { player: LeaderboardEntry; highlight: boolean }) {
-  const rankBg = player.rank === 1 ? 'bg-[var(--gold)]' : player.rank === 2 ? 'bg-[var(--silver)]' : player.rank === 3 ? 'bg-[var(--bronze)]' : 'bg-[var(--bg-secondary)]';
+function TableRow({ player, isMe }: { player: LeaderboardEntry; isMe: boolean }) {
+  const rankCls = player.rank === 1 ? styles.rank1 : player.rank === 2 ? styles.rank2 : player.rank === 3 ? styles.rank3 : '';
   return (
-    <div className={`grid grid-cols-12 items-center px-5 py-3.5 transition-colors ${highlight ? 'bg-[var(--yellow)]/25' : 'hover:bg-[var(--paper)]'}`}>
-      <div className="col-span-2 sm:col-span-1">
-        <span className={`min-w-7 h-7 px-1 rounded-lg border-[1.5px] border-[var(--ink)] font-mono font-black text-xs flex items-center justify-center shadow-[1px_1px_0_var(--ink)] w-fit ${rankBg} ${player.rank <= 3 ? 'text-[#1b1712]' : 'text-[var(--ink)]'}`}>
-          #{player.rank}
-        </span>
-      </div>
-      <div className="col-span-6 sm:col-span-5 flex items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] flex items-center justify-center text-xs font-black shrink-0 text-[var(--ink)]">
-          {player.name.charAt(0)}
-        </div>
-        <div className="min-w-0">
-          <div className="font-extrabold text-sm text-[var(--ink)] truncate">
-            {player.name}
-            {highlight && <span className="ml-1.5 text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)]">YOU</span>}
+    <tr className={`${styles.tableRow} ${isMe ? styles.meRow : ''}`}>
+      <td className={styles.rankCell}>
+        <span className={`${styles.rankNumber} ${rankCls}`}>{player.rank}</span>
+      </td>
+      <td>
+        <div className={styles.userCell}>
+          <div className={styles.userAvatarSmall}>{player.name.charAt(0).toUpperCase()}</div>
+          <div className={styles.userNameBlock}>
+            <div className={styles.userDisplayName}>
+              <span className={styles.nameText}>{player.name}</span>
+              {isMe && <span className={styles.youTag}>YOU</span>}
+            </div>
+            <div className={styles.userUid}>{player.uid}</div>
           </div>
-          <div className="font-mono text-[11px] font-bold text-[var(--red)]">{player.uid}</div>
         </div>
-      </div>
-      <div className="hidden sm:block sm:col-span-2 text-center"><Streak n={player.streak} /></div>
-      <div className="col-span-4 sm:col-span-2 text-right">
-        <div className="font-mono font-black text-sm text-[var(--ink)]">{player.cwRatio.toFixed(2)} CW</div>
-        <div className="text-[10px] font-mono font-bold text-[var(--text-muted)]">{player.correctCount}C / {player.wrongCount}W</div>
-      </div>
-      <div className="hidden sm:block sm:col-span-2 text-right">
-        <span className="font-mono text-base font-black text-[var(--ink)]">{player.points}</span>
-        <span className="font-mono text-xs font-bold text-[var(--ink)] ml-0.5">★</span>
-      </div>
-    </div>
+      </td>
+      <td style={{ textAlign: 'center' }}>
+        <span className={styles.scoreHighlight}>{player.points}</span>
+      </td>
+      <td>
+        <div className={styles.pills}>
+          <span className={`${styles.pill} ${styles.correctPill}`}>{player.correctCount} C</span>
+          <span className={`${styles.pill} ${styles.wrongPill}`}>{player.wrongCount} W</span>
+          <span className={`${styles.pill} ${styles.ratioPill}`} title="Correct ÷ Wrong">{player.cwRatio.toFixed(2)} CW</span>
+        </div>
+      </td>
+      <td style={{ textAlign: 'center' }}>
+        {player.streak > 0 ? (
+          <span className={styles.streakCell} title={`${player.streak}-day streak`}>
+            <Flame size={16} style={{ color: 'var(--red)', fill: 'var(--red)' }} />
+            {player.streak}
+          </span>
+        ) : (
+          <span className={styles.textMuted}>—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -107,75 +122,79 @@ export function LeaderboardView() {
   }, [sortBy]);
 
   const entries = data?.entries ?? [];
-  const top = (rank: number) => entries.find((e) => e.rank === rank);
+  const byRank = (r: number) => entries.find((e) => e.rank === r);
+  const podium: { user: LeaderboardEntry; rank: 1 | 2 | 3 }[] = [];
+  if (byRank(2)) podium.push({ user: byRank(2)!, rank: 2 });
+  if (byRank(1)) podium.push({ user: byRank(1)!, rank: 1 });
+  if (byRank(3)) podium.push({ user: byRank(3)!, rank: 3 });
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {entries.length >= 3 && (
-        <div className="pt-2">
-          <div className="text-center mb-6">
-            <h3 className="text-2xl font-black tracking-tight text-[var(--ink)]">Top Quizzers Podium</h3>
+    <div className={styles.wrapper}>
+      {/* Podium: shown when sorting by points */}
+      {sortBy === 'points' && podium.length > 0 && (
+        <section className={styles.podiumSection}>
+          <h3 className={styles.podiumTitle}>Top Quizzers</h3>
+          <div className={styles.podiumContainer}>
+            {podium.map(({ user, rank }) => (
+              <PodiumCard key={user.id} user={user} rank={rank} />
+            ))}
           </div>
-          <div className="flex flex-col md:flex-row justify-center gap-6 md:gap-5 md:items-end">
-            {top(2) && <Podium p={top(2)!} place={2} />}
-            {top(1) && <Podium p={top(1)!} place={1} />}
-            {top(3) && <Podium p={top(3)!} place={3} />}
-          </div>
-        </div>
+        </section>
       )}
 
-      <div className="card-neo p-4 flex items-center justify-between gap-4 bg-[var(--bg-secondary)] flex-wrap">
-        <div className="text-xs font-bold text-[var(--text-secondary)]">
+      <div className={styles.controlsBar}>
+        <div className={styles.countLabel}>
           Top 10 of {data?.total ?? 0} {data?.total === 1 ? 'member' : 'members'}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[var(--text-secondary)]">Sort by:</span>
-          <div className="inline-flex rounded-full border-[2px] border-[var(--ink)] p-0.5 bg-[var(--paper)] shadow-[2px_2px_0_var(--ink)]">
-            {(['points', 'cw'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSortBy(s)}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                  sortBy === s ? 'bg-[var(--yellow)] text-[#1b1712] border-[1.5px] border-[var(--ink)] shadow-[1px_1px_0_var(--ink)]' : 'text-[var(--text-secondary)]'
-                }`}
-              >
-                {s === 'points' ? 'Points ★' : 'CW Ratio'}
-              </button>
-            ))}
+        <div className={styles.sortOptions}>
+          <span className={styles.sortLabel}>Sort By:</span>
+          <div className={styles.sortButtonGroup}>
+            <button onClick={() => setSortBy('points')} className={`${styles.sortButton} ${sortBy === 'points' ? styles.sortButtonActive : ''}`}>
+              <Award size={14} /> Points
+            </button>
+            <button onClick={() => setSortBy('cw')} className={`${styles.sortButton} ${sortBy === 'cw' ? styles.sortButtonActive : ''}`}>
+              <Target size={14} /> CW Ratio
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="card-neo overflow-hidden bg-[var(--bg-secondary)]">
-        <div className="grid grid-cols-12 px-5 py-3 border-b-[2.5px] border-[var(--ink)] bg-[var(--paper-deep)] text-xs font-black uppercase tracking-wider text-[var(--ink)]">
-          <span className="col-span-2 sm:col-span-1">Rank</span>
-          <span className="col-span-6 sm:col-span-5">Member</span>
-          <span className="hidden sm:block sm:col-span-2 text-center">Streak</span>
-          <span className="col-span-4 sm:col-span-2 text-right">CW</span>
-          <span className="hidden sm:block sm:col-span-2 text-right">Points</span>
-        </div>
-
-        <div className="divide-y-[2px] divide-[var(--ink)]">
-          {loading && !data ? (
-            <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">Loading leaderboard…</div>
-          ) : loadError ? (
-            <div className="p-10 text-center text-xs font-bold text-[var(--red)]">{loadError}</div>
-          ) : entries.length === 0 ? (
-            <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">No participants on the leaderboard yet.</div>
-          ) : (
-            <>
-              {entries.map((p) => (
-                <Row key={p.id} player={p} highlight={p.id === data?.meId} />
-              ))}
-              {data?.me && (
-                <>
-                  <div className="py-1.5 text-center text-xs font-black tracking-widest text-[var(--text-muted)] bg-[var(--paper-deep)]">• • •</div>
-                  <Row player={data.me} highlight />
-                </>
-              )}
-            </>
-          )}
-        </div>
+      <div className={styles.tableCard}>
+        {loading && !data ? (
+          <div className={styles.noResults}>Loading leaderboard…</div>
+        ) : loadError ? (
+          <div className={`${styles.noResults} ${styles.errorText}`}>{loadError}</div>
+        ) : entries.length === 0 ? (
+          <div className={styles.noResults}>
+            <Search size={28} style={{ margin: '0 auto 0.5rem' }} />
+            No participants on the leaderboard yet.
+          </div>
+        ) : (
+          <div className={styles.tableResponsive}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th style={{ width: '70px', textAlign: 'center' }}>Rank</th>
+                  <th>Member</th>
+                  <th style={{ textAlign: 'center' }}>Points</th>
+                  <th style={{ textAlign: 'center' }}>Correct / Wrong</th>
+                  <th style={{ textAlign: 'center' }}>Streak</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((p) => (
+                  <TableRow key={p.id} player={p} isMe={p.id === data?.meId} />
+                ))}
+                {data?.me && (
+                  <>
+                    <tr className={styles.gapRow}><td colSpan={5}>• • •</td></tr>
+                    <TableRow player={data.me} isMe />
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

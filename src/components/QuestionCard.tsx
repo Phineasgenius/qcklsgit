@@ -113,7 +113,7 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
       {/* 1. Header & Meta Badges */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b-[2px] border-[var(--ink)]">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-black px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
+          <span className="font-mono text-xs font-black px-3 py-1 rounded-full bg-[var(--yellow)] text-[#1b1712] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
             EDITION #{question.edition}
           </span>
           <span className="text-xs font-bold text-[var(--text-secondary)] font-mono">{question.date || 'Today'}</span>

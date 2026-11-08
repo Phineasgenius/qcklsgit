@@ -316,7 +316,7 @@ export function QuizmasterDashboard({
                       key={n}
                       onClick={() => setHintCount(n)}
                       className={`flex-1 py-1.5 rounded-xl border-[2px] border-[var(--ink)] text-xs font-black transition-all ${
-                        hintCount === n ? 'bg-[var(--yellow)] text-[var(--ink)] shadow-[2px_2px_0_var(--ink)]' : 'bg-[var(--paper)] text-[var(--text-secondary)]'
+                        hintCount === n ? 'bg-[var(--yellow)] text-[#1b1712] shadow-[2px_2px_0_var(--ink)]' : 'bg-[var(--paper)] text-[var(--text-secondary)]'
                       }`}
                     >
                       {n} {n === 1 ? 'Hint' : 'Hints'}

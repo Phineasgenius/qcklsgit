@@ -60,7 +60,7 @@ export function Header({
               <h1 className="text-[clamp(1.25rem,2.5vw,1.95rem)] font-black tracking-tight text-[var(--ink)] leading-tight whitespace-normal">
                 Quiz Club KLS GIT
               </h1>
-              <span className="text-[clamp(9px,1vw,11px)] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] shrink-0">
+              <span className="text-[clamp(9px,1vw,11px)] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--yellow)] text-[#1b1712] border-[1.5px] border-[var(--ink)] shrink-0">
                 QC
               </span>
             </div>
@@ -78,7 +78,7 @@ export function Header({
               onClick={() => onTabChange('quiz')}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
                 activeTab === 'quiz'
-                  ? 'bg-[var(--yellow)] text-[var(--ink)] shadow-[2px_2px_0_var(--ink)] border-[1.5px] border-[var(--ink)]'
+                  ? 'bg-[var(--yellow)] text-[#1b1712] shadow-[2px_2px_0_var(--ink)] border-[1.5px] border-[var(--ink)]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--ink)]'
               }`}
             >
@@ -88,7 +88,7 @@ export function Header({
               onClick={() => onTabChange('leaderboard')}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
                 activeTab === 'leaderboard'
-                  ? 'bg-[var(--yellow)] text-[var(--ink)] shadow-[2px_2px_0_var(--ink)] border-[1.5px] border-[var(--ink)]'
+                  ? 'bg-[var(--yellow)] text-[#1b1712] shadow-[2px_2px_0_var(--ink)] border-[1.5px] border-[var(--ink)]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--ink)]'
               }`}
             >
@@ -155,7 +155,7 @@ export function Header({
                   <span className="text-[9px] text-[var(--text-muted)] font-mono leading-none">{currentUser.uid}</span>
                 </div>
                 {currentUser.role === 'user' && (
-                  <span className="px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)] font-mono text-[10px]">
+                  <span className="px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)] font-mono text-[10px]">
                     {currentUser.points}★
                   </span>
                 )}

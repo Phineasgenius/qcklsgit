@@ -96,7 +96,7 @@ export default function HomePage() {
                   {qotd.streak.current}-day streak
                 </span>
               )}
-              <span className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)]">
+              <span className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)]">
                 {currentUser.points} ★ Points
               </span>
               {currentUser.role === 'user' && (
@@ -130,7 +130,7 @@ export default function HomePage() {
               </div>
 
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] text-xs font-black uppercase">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--yellow)] text-[#1b1712] border-[1.5px] border-[var(--ink)] text-xs font-black uppercase">
                   <Flame className="w-3.5 h-3.5 fill-[var(--ink)]" />
                   <span>{qotd?.question ? `Edition #${qotd.question.edition} is Live` : 'Question of the Day'}</span>
                 </div>

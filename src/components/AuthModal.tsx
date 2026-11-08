@@ -163,7 +163,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'user', onLoginSuccess
   const tabCls = (active: boolean, red = false) =>
     `py-1 text-xs font-bold rounded-full transition-all ${
       active
-        ? `${red ? 'bg-[var(--red)] text-white' : 'bg-[var(--yellow)] text-[var(--ink)]'} shadow-[1px_1px_0_var(--ink)] border-[1.5px] border-[var(--ink)]`
+        ? `${red ? 'bg-[var(--red)] text-white' : 'bg-[var(--yellow)] text-[#1b1712]'} shadow-[1px_1px_0_var(--ink)] border-[1.5px] border-[var(--ink)]`
         : 'text-[var(--text-secondary)]'
     }`;
 
