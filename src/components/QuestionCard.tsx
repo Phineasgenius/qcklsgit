@@ -1,193 +1,104 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Question, HintTier, Submission } from '@/types';
+import { HintTier, QotdState } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { checkAnswer, MatchResult } from '@/lib/fuzzyMatch';
-import { recordSubmission } from '@/lib/storage';
+import { apiFetch } from '@/lib/api';
 import confetti from 'canvas-confetti';
-import { 
-  Send, 
-  Lock, 
-  Unlock, 
-  CheckCircle2, 
-  XCircle, 
-  Share2, 
+import {
+  Send,
+  Lock,
+  Unlock,
+  CheckCircle2,
+  XCircle,
+  Share2,
   ShieldAlert,
   Flame,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 interface QuestionCardProps {
-  question: Question;
+  qotd: QotdState;
+  onChange: (state: QotdState) => void;
   onOpenShareModal: (points: number, hints: HintTier[]) => void;
 }
 
-export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) {
-  const { currentUser, refreshUser } = useAuth();
+const HINT_META: Record<HintTier, { label: string; badgeColor: string; maxPts: number }> = {
+  difficult: { label: 'Clue 1 • Toughest Hint', badgeColor: 'bg-[var(--coral)]', maxPts: 90 },
+  medium: { label: 'Clue 2 • Medium Hint', badgeColor: 'bg-[var(--yellow)]', maxPts: 70 },
+  easy: { label: 'Clue 3 • Easiest Hint', badgeColor: 'bg-[var(--teal)]', maxPts: 50 },
+};
 
-  const [unlockedHints, setUnlockedHints] = useState<HintTier[]>([]);
+export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardProps) {
+  const { refreshUser } = useAuth();
+  const question = qotd.question!;
+  const { submission, solution, unlockedHints } = qotd;
+
   const [guess, setGuess] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [emptyError, setEmptyError] = useState('');
-  const [lastResult, setLastResult] = useState<MatchResult | null>(null);
-  const [hasSolved, setHasSolved] = useState(false);
-  const [hasForfeited, setHasForfeited] = useState(false);
-  const [pointsEarned, setPointsEarned] = useState<number | null>(null);
-
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [confirmUnlockTier, setConfirmUnlockTier] = useState<HintTier | null>(null);
   const [showForfeitModal, setShowForfeitModal] = useState(false);
 
-  // Scoring Rule:
-  // No hints: 100 pts
-  // Difficult hint: 90 pts
-  // Medium hint: 70 pts
-  // Easy hint: 50 pts
-  const calculateCurrentPotentialPoints = (): number => {
-    if (unlockedHints.includes('easy')) return 50;
-    if (unlockedHints.includes('medium')) return 70;
-    if (unlockedHints.includes('difficult')) return 90;
-    return 100;
-  };
+  const unlockedTiers = Object.keys(unlockedHints) as HintTier[];
+  const potentialPoints = unlockedTiers.includes('easy')
+    ? 50
+    : unlockedTiers.includes('medium')
+    ? 70
+    : unlockedTiers.includes('difficult')
+    ? 90
+    : 100;
 
-  const potentialPoints = calculateCurrentPotentialPoints();
+  const finished = submission !== null;
+  const solved = submission?.isCorrect === true;
+  const forfeited = submission?.forfeited === true;
+  const wrong = finished && !solved && !forfeited;
 
-  const handleUnlockHint = (tier: HintTier) => {
-    if (!unlockedHints.includes(tier)) {
-      setUnlockedHints(prev => [...prev, tier]);
+  // Every action goes to the server; the server owns all state (hints, points, attempts).
+  const post = async (url: string, body?: unknown): Promise<QotdState | null> => {
+    setBusy(true);
+    setError('');
+    const res = await apiFetch<{ state?: QotdState }>(url, { method: 'POST', body: body ?? {} });
+    setBusy(false);
+    if (res.data.state) onChange(res.data.state);
+    if (!res.ok) {
+      setError(res.data.error || 'Something went wrong. Please try again.');
+      return null;
     }
-    setConfirmUnlockTier(null);
+    return res.data.state ?? null;
   };
 
-  const handleGuessSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setEmptyError('');
+  const handleUnlockHint = async (tier: HintTier) => {
+    setConfirmUnlockTier(null);
+    await post('/api/qotd/hint', { tier });
+  };
 
+  const handleGuessSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (busy || finished) return;
     if (!guess.trim()) {
-      setEmptyError('Answer is empty. Please enter your answer or expected funda.');
+      setError('Answer is empty. Please enter your answer or expected funda.');
       return;
     }
-
-    if (submitting || hasSolved || hasForfeited) return;
-
-    setSubmitting(true);
-
-    const result = checkAnswer(
-      guess,
-      question.answer,
-      question.funda,
-      question.fundaKeywords || []
-    );
-
-    setLastResult(result);
-
-    if (result.isMatch) {
-      const awarded = potentialPoints;
-      setPointsEarned(awarded);
-      setHasSolved(true);
-
+    const state = await post('/api/qotd/submit', { guess });
+    if (!state) return;
+    await refreshUser();
+    if (state.submission?.isCorrect) {
       try {
-        confetti({
-          particleCount: 90,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#ffce4a', '#ff3b2f', '#36c2ad', '#1b1712']
-        });
+        confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 }, colors: ['#ffce4a', '#ff3b2f', '#36c2ad', '#1b1712'] });
       } catch (err) {
         console.error(err);
       }
-
-      if (currentUser) {
-        const sub: Submission = {
-          id: `sub-${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          userUid: currentUser.uid,
-          questionId: question.id,
-          guess: guess.trim(),
-          hintsUnlocked: unlockedHints,
-          pointsAwarded: awarded,
-          isCorrect: true,
-          matchScore: result.confidence,
-          matchFeedback: result.reason,
-          timestamp: new Date().toISOString(),
-        };
-        recordSubmission(sub);
-        refreshUser();
-      }
-    } else {
-      if (currentUser) {
-        const sub: Submission = {
-          id: `sub-${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          userUid: currentUser.uid,
-          questionId: question.id,
-          guess: guess.trim(),
-          hintsUnlocked: unlockedHints,
-          pointsAwarded: 0,
-          isCorrect: false,
-          matchScore: result.confidence,
-          matchFeedback: result.reason,
-          timestamp: new Date().toISOString(),
-        };
-        recordSubmission(sub);
-        refreshUser();
-      }
     }
-
-    setSubmitting(false);
   };
 
-  const handleConfirmForfeit = () => {
+  const handleConfirmForfeit = async () => {
     setShowForfeitModal(false);
-    setHasForfeited(true);
-    setPointsEarned(0);
-
-    if (currentUser) {
-      const sub: Submission = {
-        id: `sub-${Date.now()}`,
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userUid: currentUser.uid,
-        questionId: question.id,
-        guess: '[Forfeited]',
-        hintsUnlocked: unlockedHints,
-        pointsAwarded: 0,
-        isCorrect: false,
-        matchScore: 0,
-        matchFeedback: 'Participant revealed the solution.',
-        timestamp: new Date().toISOString(),
-      };
-      recordSubmission(sub);
-      refreshUser();
-    }
+    const state = await post('/api/qotd/forfeit');
+    if (state) await refreshUser();
   };
 
-  // 3 Hints: Difficult -> Medium -> Easy
-  const hints = [
-    {
-      tier: 'difficult' as HintTier,
-      label: 'Clue 1 • Toughest Hint',
-      badgeColor: 'bg-[var(--coral)]',
-      maxPts: 90,
-      text: question.hints?.difficult,
-    },
-    {
-      tier: 'medium' as HintTier,
-      label: 'Clue 2 • Medium Hint',
-      badgeColor: 'bg-[var(--yellow)]',
-      maxPts: 70,
-      text: question.hints?.medium,
-    },
-    {
-      tier: 'easy' as HintTier,
-      label: 'Clue 3 • Easiest Hint',
-      badgeColor: 'bg-[var(--teal)]',
-      maxPts: 50,
-      text: question.hints?.easy,
-    },
-  ].filter(h => Boolean(h.text));
+  const hints = question.availableHints.map((tier) => ({ tier, ...HINT_META[tier], text: unlockedHints[tier] }));
 
   return (
     <div className="card-neo p-6 md:p-8 space-y-7">
@@ -197,16 +108,13 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
           <span className="font-mono text-xs font-black px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
             EDITION #{question.edition}
           </span>
-          <span className="text-xs font-bold text-[var(--text-secondary)] font-mono">
-            {question.date || 'Today'}
-          </span>
+          <span className="text-xs font-bold text-[var(--text-secondary)] font-mono">{question.date || 'Today'}</span>
         </div>
 
-        {/* Potential Score Badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[var(--text-secondary)]">Available Reward:</span>
+          <span className="text-xs font-bold text-[var(--text-secondary)]">{finished ? 'Your Reward:' : 'Available Reward:'}</span>
           <span className="font-mono font-black text-sm px-3 py-0.5 rounded-full bg-[var(--bg-secondary)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
-            {hasSolved ? pointsEarned : potentialPoints} ★
+            {finished ? submission!.pointsAwarded : potentialPoints} ★
           </span>
         </div>
       </div>
@@ -221,19 +129,15 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
           {question.questionText}
         </h2>
         <p className="text-xs font-semibold text-[var(--text-secondary)]">
-          Answering the exact name or the underlying expected funda/concept is accepted as correct!
+          Answering the exact name or the underlying expected funda/concept is accepted as correct! You get <strong>one attempt</strong>.
         </p>
       </div>
 
-      {/* 3. CLUE STACK (3 HINTS: DIFFICULT -> MEDIUM -> EASY) */}
+      {/* 3. CLUE STACK */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between text-xs font-bold">
-          <span className="uppercase tracking-wider text-[var(--text-secondary)]">
-            Hints Stack ({hints.length} available)
-          </span>
-          <span className="text-[var(--text-muted)] font-mono">
-            Unlocking drops maximum score
-          </span>
+          <span className="uppercase tracking-wider text-[var(--text-secondary)]">Hints Stack ({hints.length} available)</span>
+          <span className="text-[var(--text-muted)] font-mono">Unlocking drops maximum score</span>
         </div>
 
         {hints.length === 0 ? (
@@ -243,15 +147,12 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
         ) : (
           <div className="grid gap-3">
             {hints.map((h) => {
-              const isUnlocked = unlockedHints.includes(h.tier);
-
+              const isUnlocked = Boolean(h.text);
               return (
                 <div
                   key={h.tier}
                   className={`rounded-xl border-[2px] border-[var(--ink)] transition-all ${
-                    isUnlocked
-                      ? 'bg-[var(--bg-secondary)] shadow-[4px_4px_0_var(--ink)]'
-                      : 'bg-[var(--paper-deep)] shadow-[2px_2px_0_var(--ink)]'
+                    isUnlocked ? 'bg-[var(--bg-secondary)] shadow-[4px_4px_0_var(--ink)]' : 'bg-[var(--paper-deep)] shadow-[2px_2px_0_var(--ink)]'
                   }`}
                 >
                   <div className="p-3.5 sm:p-4 flex items-center justify-between gap-3">
@@ -259,9 +160,7 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
                       <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border-[1.5px] border-[var(--ink)] text-[var(--ink)] ${h.badgeColor}`}>
                         {h.tier.toUpperCase()}
                       </span>
-                      <span className="font-extrabold text-sm text-[var(--ink)]">
-                        {h.label}
-                      </span>
+                      <span className="font-extrabold text-sm text-[var(--ink)]">{h.label}</span>
                     </div>
 
                     {isUnlocked ? (
@@ -272,8 +171,8 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
                     ) : (
                       <button
                         onClick={() => setConfirmUnlockTier(h.tier)}
-                        disabled={hasSolved || hasForfeited}
-                        className="btn-neo btn-neo-secondary !py-1 !px-3 text-xs"
+                        disabled={finished || busy}
+                        className="btn-neo btn-neo-secondary !py-1 !px-3 text-xs disabled:opacity-50"
                       >
                         <Lock className="w-3 h-3 text-[var(--ink)]" />
                         <span>Unlock (Max {h.maxPts}★)</span>
@@ -283,9 +182,7 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
 
                   {isUnlocked && (
                     <div className="px-4 pb-4 pt-1 border-t-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] text-sm font-medium leading-relaxed rounded-b-xl">
-                      <p className="text-[var(--ink)]">
-                        {h.text}
-                      </p>
+                      <p className="text-[var(--ink)]">{h.text}</p>
                     </div>
                   )}
                 </div>
@@ -295,30 +192,29 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
         )}
       </div>
 
-      {/* 4. ANSWER INPUT & SUBMISSION (NO PLACEHOLDERS) */}
+      {/* 4. ANSWER INPUT & RESULT */}
       <div className="pt-4 border-t-[2.5px] border-[var(--ink)] space-y-4">
-        {!hasSolved && !hasForfeited ? (
+        {!finished && (
           <form onSubmit={handleGuessSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-[var(--text-secondary)]">
-                Your Answer or Funda
-              </label>
+              <label className="text-xs font-black uppercase tracking-wider text-[var(--text-secondary)]">Your Answer or Funda</label>
               <input
                 type="text"
                 value={guess}
                 onChange={(e) => {
                   setGuess(e.target.value);
-                  if (emptyError) setEmptyError('');
+                  if (error) setError('');
                 }}
                 placeholder="Type your answer or funda..."
+                maxLength={300}
                 className="w-full px-4 py-3.5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--bg-secondary)] text-[var(--ink)] text-sm font-semibold shadow-[4px_4px_0_var(--ink)] focus:outline-none focus:translate-x-[-1px] focus:translate-y-[-1px] focus:shadow-[6px_6px_0_var(--ink)] transition-all placeholder:text-[var(--text-muted)] placeholder:font-normal"
               />
             </div>
 
-            {emptyError && (
+            {error && (
               <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/20 text-xs font-bold text-[var(--ink)] flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-[var(--red)] shrink-0" />
-                <span>{emptyError}</span>
+                <span>{error}</span>
               </div>
             )}
 
@@ -326,57 +222,50 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
               <button
                 type="button"
                 onClick={() => setShowForfeitModal(true)}
+                disabled={busy}
                 className="btn-neo btn-neo-secondary text-xs text-[var(--red)]"
               >
                 Reveal Answer (Forfeit)
               </button>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="btn-neo btn-neo-primary text-xs !py-3 !px-6"
-              >
+              <button type="submit" disabled={busy} className="btn-neo btn-neo-primary text-xs !py-3 !px-6">
                 <Send className="w-4 h-4" />
-                <span>Submit Answer ({potentialPoints} ★)</span>
+                <span>{busy ? 'Checking…' : `Submit Answer (${potentialPoints} ★)`}</span>
               </button>
             </div>
           </form>
-        ) : null}
+        )}
+
+        {/* Error that arrives after the question is already finished (e.g. 409) */}
+        {finished && error && (
+          <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/20 text-xs font-bold text-[var(--ink)]">{error}</div>
+        )}
 
         {/* When Solved */}
-        {hasSolved && (
+        {solved && (
           <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--teal)]/20 shadow-[6px_6px_0_var(--ink)] space-y-3 animate-fadeIn">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-7 h-7 text-[var(--teal)] stroke-[2.5] shrink-0" />
                 <div>
-                  <h4 className="text-xl font-black text-[var(--ink)]">
-                    CORRECT! +{pointsEarned} POINTS AWARDED
-                  </h4>
-                  <p className="text-xs font-semibold text-[var(--text-secondary)] mt-0.5">
-                    {lastResult?.reason}
-                  </p>
+                  <h4 className="text-xl font-black text-[var(--ink)]">CORRECT! +{submission!.pointsAwarded} POINTS AWARDED</h4>
+                  <p className="text-xs font-semibold text-[var(--text-secondary)] mt-0.5">{submission!.feedback}</p>
                 </div>
               </div>
               <span className="font-mono text-2xl font-black text-[var(--ink)] px-3 py-1 rounded-xl bg-[var(--yellow)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
-                +{pointsEarned}★
+                +{submission!.pointsAwarded}★
               </span>
             </div>
 
-            <div className="pt-2 border-t-[2px] border-[var(--ink)] text-xs font-bold text-[var(--ink)]">
-              Official Solution: <span className="font-normal">{question.answer}</span>
-              {question.funda && (
-                <div className="mt-1 text-[var(--text-secondary)] font-medium">
-                  Accepted Funda: {question.funda}
-                </div>
-              )}
-            </div>
+            {solution && (
+              <div className="pt-2 border-t-[2px] border-[var(--ink)] text-xs font-bold text-[var(--ink)]">
+                Official Solution: <span className="font-normal">{solution.answer}</span>
+                {solution.funda && <div className="mt-1 text-[var(--text-secondary)] font-medium">Accepted Funda: {solution.funda}</div>}
+              </div>
+            )}
 
             <div className="flex justify-end pt-1">
-              <button
-                onClick={() => onOpenShareModal(pointsEarned || 100, unlockedHints)}
-                className="btn-neo btn-neo-yellow text-xs"
-              >
+              <button onClick={() => onOpenShareModal(submission!.pointsAwarded, submission!.hintsUnlocked)} className="btn-neo btn-neo-yellow text-xs">
                 <Share2 className="w-3.5 h-3.5" />
                 <span>Share Results</span>
               </button>
@@ -384,34 +273,39 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
           </div>
         )}
 
-        {/* When Forfeited */}
-        {hasForfeited && (
-          <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[6px_6px_0_var(--ink)] space-y-2">
+        {/* Wrong answer: the single attempt is used */}
+        {wrong && (
+          <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[6px_6px_0_var(--ink)] space-y-2 animate-fadeIn">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="w-6 h-6 text-[var(--red)] stroke-[2.5]" />
-              <h4 className="text-lg font-black text-[var(--ink)]">
-                Puzzle Forfeited (0 Points)
-              </h4>
+              <XCircle className="w-6 h-6 text-[var(--red)] stroke-[2.5]" />
+              <h4 className="text-lg font-black text-[var(--ink)]">Not this time (0 Points)</h4>
             </div>
             <p className="text-xs font-medium text-[var(--text-secondary)]">
-              The official solution is:
+              You answered &quot;{submission!.guess}&quot;. Your attempt for this question is used — come back for the next one!
             </p>
-            <div className="p-3 rounded-lg border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] font-bold text-sm text-[var(--ink)]">
-              {question.answer}
-              {question.funda && (
-                <div className="mt-1 text-xs text-[var(--text-secondary)] font-medium">
-                  Accepted Funda: {question.funda}
-                </div>
-              )}
-            </div>
+            {solution && (
+              <div className="p-3 rounded-lg border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] font-bold text-sm text-[var(--ink)]">
+                {solution.answer}
+                {solution.funda && <div className="mt-1 text-xs text-[var(--text-secondary)] font-medium">Accepted Funda: {solution.funda}</div>}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Incorrect guess feedback */}
-        {lastResult && !lastResult.isMatch && !hasForfeited && (
-          <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/15 text-xs font-bold text-[var(--ink)] flex items-center gap-2.5 shadow-[3px_3px_0_var(--ink)] animate-shake">
-            <XCircle className="w-5 h-5 text-[var(--red)] shrink-0" />
-            <span>{lastResult.reason}</span>
+        {/* When Forfeited */}
+        {forfeited && (
+          <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[6px_6px_0_var(--ink)] space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-6 h-6 text-[var(--red)] stroke-[2.5]" />
+              <h4 className="text-lg font-black text-[var(--ink)]">Puzzle Forfeited (0 Points)</h4>
+            </div>
+            <p className="text-xs font-medium text-[var(--text-secondary)]">The official solution is:</p>
+            {solution && (
+              <div className="p-3 rounded-lg border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] font-bold text-sm text-[var(--ink)]">
+                {solution.answer}
+                {solution.funda && <div className="mt-1 text-xs text-[var(--text-secondary)] font-medium">Accepted Funda: {solution.funda}</div>}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -422,30 +316,15 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
           <div className="card-neo w-full max-w-md p-6 bg-[var(--bg-secondary)] space-y-4">
             <div className="flex items-center gap-2 text-[var(--red)]">
               <ShieldAlert className="w-6 h-6 stroke-[2.5]" />
-              <h3 className="text-lg font-extrabold text-[var(--ink)]">
-                Unlock Clue Confirmation
-              </h3>
+              <h3 className="text-lg font-extrabold text-[var(--ink)]">Unlock Clue Confirmation</h3>
             </div>
             <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
               Unlocking this clue caps your potential score to{' '}
-              <strong className="text-[var(--ink)] font-black">
-                {confirmUnlockTier === 'difficult' ? '90 ★' : confirmUnlockTier === 'medium' ? '70 ★' : '50 ★'}
-              </strong>
-              . Are you sure you want to reveal it?
+              <strong className="text-[var(--ink)] font-black">{HINT_META[confirmUnlockTier].maxPts} ★</strong>. Are you sure you want to reveal it?
             </p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                onClick={() => setConfirmUnlockTier(null)}
-                className="btn-neo btn-neo-secondary text-xs"
-              >
-                Keep Thinking
-              </button>
-              <button
-                onClick={() => handleUnlockHint(confirmUnlockTier)}
-                className="btn-neo btn-neo-primary text-xs"
-              >
-                Yes, Reveal Clue
-              </button>
+              <button onClick={() => setConfirmUnlockTier(null)} className="btn-neo btn-neo-secondary text-xs">Keep Thinking</button>
+              <button onClick={() => handleUnlockHint(confirmUnlockTier)} className="btn-neo btn-neo-primary text-xs">Yes, Reveal Clue</button>
             </div>
           </div>
         </div>
@@ -457,26 +336,14 @@ export function QuestionCard({ question, onOpenShareModal }: QuestionCardProps) 
           <div className="card-neo w-full max-w-md p-6 bg-[var(--bg-secondary)] space-y-4">
             <div className="flex items-center gap-2 text-[var(--red)]">
               <ShieldAlert className="w-6 h-6 stroke-[2.5]" />
-              <h3 className="text-lg font-extrabold text-[var(--ink)]">
-                Forfeit Puzzle?
-              </h3>
+              <h3 className="text-lg font-extrabold text-[var(--ink)]">Forfeit Puzzle?</h3>
             </div>
             <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
-              Revealing the solution will forfeit your chance to earn points for Edition #{question.edition}. We encourage trying another guess or unlocking a clue first!
+              Revealing the solution will forfeit your only attempt at Edition #{question.edition}. We encourage unlocking a clue first!
             </p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                onClick={() => setShowForfeitModal(false)}
-                className="btn-neo btn-neo-secondary text-xs"
-              >
-                Keep Trying
-              </button>
-              <button
-                onClick={handleConfirmForfeit}
-                className="btn-neo btn-neo-primary text-xs"
-              >
-                Reveal Answer (0 pts)
-              </button>
+              <button onClick={() => setShowForfeitModal(false)} className="btn-neo btn-neo-secondary text-xs">Keep Trying</button>
+              <button onClick={handleConfirmForfeit} className="btn-neo btn-neo-primary text-xs">Reveal Answer (0 pts)</button>
             </div>
           </div>
         </div>

@@ -1,162 +1,99 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '@/types';
-import { getStoredUsers, saveStoredUsers, deleteUser } from '@/lib/storage';
+import { apiFetch } from '@/lib/api';
+
+export interface ActionResult {
+  success: boolean;
+  message: string;
+}
+
+export interface ProfileInput {
+  year: string;
+  branch: string;
+  designation: string;
+}
+
+export interface RegisterInput extends ProfileInput {
+  name: string;
+  uid: string;
+  password: string;
+}
 
 interface AuthContextType {
   currentUser: User | null;
   isQM: boolean;
-  loginUser: (uid: string, pass: string) => { success: boolean; message: string };
-  registerUser: (name: string, uid: string, pass: string) => { success: boolean; message: string };
-  loginQM: (username: string, pass: string) => { success: boolean; message: string };
-  logout: () => void;
-  deleteMyAccount: () => void;
-  refreshUser: () => void;
+  loading: boolean;
+  loginUser: (uid: string, pass: string) => Promise<ActionResult>;
+  registerUser: (input: RegisterInput) => Promise<ActionResult>;
+  loginQM: (username: string, pass: string) => Promise<ActionResult>;
+  updateProfile: (input: ProfileInput) => Promise<ActionResult>;
+  logout: () => Promise<void>;
+  deleteMyAccount: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  setCurrentUser: (u: User | null) => void;
 }
-
-const CURRENT_USER_KEY = 'qcklsgit_active_session_v1';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type UserResponse = { user?: User | null; message?: string };
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(CURRENT_USER_KEY);
-      if (saved) {
-        const user = JSON.parse(saved);
-        // Refresh with latest from stored users
-        const users = getStoredUsers();
-        const found = users.find(u => u.id === user.id);
-        setCurrentUser(found || user);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const refreshUser = useCallback(async () => {
+    const res = await apiFetch<UserResponse>('/api/auth/me');
+    if (res.ok) setCurrentUser(res.data.user ?? null);
   }, []);
 
-  const refreshUser = () => {
-    if (!currentUser) return;
-    const users = getStoredUsers();
-    const found = users.find(u => u.id === currentUser.id);
-    if (found) {
-      setCurrentUser(found);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(found));
+  // The session lives in an httpOnly cookie; ask the server who we are.
+  useEffect(() => {
+    (async () => {
+      await refreshUser();
+      setLoading(false);
+    })();
+  }, [refreshUser]);
+
+  const authCall = async (url: string, body: unknown): Promise<ActionResult> => {
+    const res = await apiFetch<UserResponse>(url, { method: 'POST', body });
+    if (res.ok && res.data.user) {
+      setCurrentUser(res.data.user);
+      return { success: true, message: res.data.message ?? 'Signed in.' };
     }
+    return { success: false, message: res.data.error ?? 'Something went wrong.' };
   };
 
-  const loginUser = (uidInput: string, passInput: string): { success: boolean; message: string } => {
-    const cleanUid = uidInput.trim().toLowerCase();
-    const cleanPass = passInput.trim();
+  const loginUser = (uid: string, password: string) => authCall('/api/auth/login', { uid, password });
+  const registerUser = (input: RegisterInput) => authCall('/api/auth/register', input);
+  const loginQM = (username: string, password: string) => authCall('/api/auth/qm', { username, password });
 
-    if (!cleanUid || !cleanPass) {
-      return { success: false, message: 'Please provide both college UID and password.' };
+  const updateProfile = async (input: ProfileInput): Promise<ActionResult> => {
+    const res = await apiFetch<UserResponse>('/api/profile', { method: 'PUT', body: input });
+    if (res.ok && res.data.user) {
+      setCurrentUser(res.data.user);
+      return { success: true, message: 'Profile saved.' };
     }
-
-    // Check if QM credentials provided in user login tab
-    if (cleanUid === 'phineas' && cleanPass === 'phineastheqm') {
-      return loginQM('phineas', 'phineastheqm');
-    }
-
-    const users = getStoredUsers();
-    const found = users.find(u => u.uid.toLowerCase() === cleanUid);
-
-    if (!found) {
-      return { 
-        success: false, 
-        message: 'UID not registered yet. Switch to "Sign Up" to register with your real name & ID card UID.' 
-      };
-    }
-
-    // Simple check for demo / persistent state
-    setCurrentUser(found);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(found));
-    return { success: true, message: `Welcome back, ${found.name}!` };
+    return { success: false, message: res.data.error ?? 'Could not save your details.' };
   };
 
-  const registerUser = (nameInput: string, uidInput: string, passInput: string): { success: boolean; message: string } => {
-    const cleanName = nameInput.trim();
-    const cleanUid = uidInput.trim().toLowerCase();
-    const cleanPass = passInput.trim();
-
-    if (!cleanName || !cleanUid || !cleanPass) {
-      return { success: false, message: 'Please fill in real name, college UID, and password.' };
-    }
-
-    if (cleanUid.length < 4) {
-      return { success: false, message: 'Please enter a valid college UID (e.g. 25u0101 as on your ID card).' };
-    }
-
-    if (cleanUid === 'phineas') {
-      return { success: false, message: 'UID "phineas" is reserved for the Quizmaster.' };
-    }
-
-    const users = getStoredUsers();
-    if (users.some(u => u.uid.toLowerCase() === cleanUid)) {
-      return { success: false, message: 'This college UID is already registered. Please sign in.' };
-    }
-
-    const newUser: User = {
-      id: `u-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name: cleanName,
-      uid: cleanUid,
-      role: 'user',
-      points: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    saveStoredUsers(users);
-    setCurrentUser(newUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
-
-    return { success: true, message: `Registration successful! Welcome to Quiz Club KLS GIT, ${cleanName}!` };
-  };
-
-  const loginQM = (username: string, pass: string): { success: boolean; message: string } => {
-    const cleanU = username.trim().toLowerCase();
-    const cleanP = pass.trim();
-
-    // Required by user: username and password phineas & phineastheqm
-    if (cleanU === 'phineas' && cleanP === 'phineastheqm') {
-      const qmUser: User = {
-        id: 'qm-phineas',
-        name: 'Phineas (Quizmaster)',
-        uid: 'phineas',
-        role: 'quizmaster',
-        points: 0,
-        correctCount: 0,
-        wrongCount: 0,
-        createdAt: new Date().toISOString(),
-      };
-
-      setCurrentUser(qmUser);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(qmUser));
-      return { success: true, message: 'Quizmaster authorized. Welcome, Phineas!' };
-    }
-
-    return { success: false, message: 'Invalid Quizmaster credentials. Expected phineas / phineastheqm.' };
-  };
-
-  const logout = () => {
+  const logout = async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     setCurrentUser(null);
-    localStorage.removeItem(CURRENT_USER_KEY);
   };
 
-  const deleteMyAccount = () => {
-    if (!currentUser) return;
-    deleteUser(currentUser.id);
-    logout();
+  const deleteMyAccount = async () => {
+    const res = await apiFetch('/api/account', { method: 'DELETE' });
+    if (res.ok) setCurrentUser(null);
   };
 
   const isQM = currentUser?.role === 'quizmaster';
 
   return (
-    <AuthContext.Provider value={{ currentUser, isQM, loginUser, registerUser, loginQM, logout, deleteMyAccount, refreshUser }}>
+    <AuthContext.Provider
+      value={{ currentUser, isQM, loading, loginUser, registerUser, loginQM, updateProfile, logout, deleteMyAccount, refreshUser, setCurrentUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

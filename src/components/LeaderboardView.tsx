@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getLeaderboard } from '@/lib/storage';
-import { User } from '@/types';
+import { apiFetch } from '@/lib/api';
+import { LeaderboardEntry } from '@/types';
 import { 
   Trophy, 
   Search, 
@@ -10,12 +10,24 @@ import {
 } from 'lucide-react';
 
 export function LeaderboardView() {
-  const [boardData, setBoardData] = useState<(User & { cwRatio: number; rank: number })[]>([]);
+  const [boardData, setBoardData] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'points' | 'cw'>('points');
 
   useEffect(() => {
-    setBoardData(getLeaderboard());
+    let cancelled = false;
+    (async () => {
+      const res = await apiFetch<{ entries?: LeaderboardEntry[] }>('/api/leaderboard');
+      if (cancelled) return;
+      if (res.ok) setBoardData(res.data.entries ?? []);
+      else setLoadError(res.data.error ?? 'Could not load the leaderboard.');
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredUsers = boardData
@@ -183,7 +195,11 @@ export function LeaderboardView() {
 
         {/* Table Body */}
         <div className="divide-y-[2px] divide-[var(--ink)]">
-          {filteredUsers.length === 0 ? (
+          {loading ? (
+            <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">Loading leaderboard…</div>
+          ) : loadError ? (
+            <div className="p-10 text-center text-xs font-bold text-[var(--red)]">{loadError}</div>
+          ) : filteredUsers.length === 0 ? (
             <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">
               {searchQuery ? `No participants found matching "${searchQuery}".` : 'No participants on the leaderboard yet.'}
             </div>

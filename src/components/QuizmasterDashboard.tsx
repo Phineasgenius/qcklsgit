@@ -1,16 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Question, User } from '@/types';
-import { 
-  getStoredQuestions, 
-  saveStoredQuestions, 
-  setActiveQuestionId, 
-  getActiveQuestionId,
-  getStoredSubmissions,
-  getStoredUsers,
-  deleteUser
-} from '@/lib/storage';
+import React, { useState, useEffect } from 'react';
+import { QMQuestion, QMUser, Submission } from '@/types';
+import { apiFetch } from '@/lib/api';
 import { 
   ShieldCheck, 
   PlusCircle, 
@@ -19,8 +11,7 @@ import {
   X,
   History,
   Layers,
-  Users as UsersIcon,
-  AlertTriangle
+  Users as UsersIcon
 } from 'lucide-react';
 
 interface QuizmasterDashboardProps {
@@ -34,12 +25,14 @@ export function QuizmasterDashboard({
   onClose,
   onQuestionActivated,
 }: QuizmasterDashboardProps) {
-  const [questions, setQuestions] = useState<Question[]>(() => getStoredQuestions());
-  const [users, setUsers] = useState<User[]>(() => getStoredUsers().filter(u => u.role === 'user'));
-  const [activeQId, setActiveQIdState] = useState<string>(() => getActiveQuestionId());
+  const [questions, setQuestions] = useState<QMQuestion[]>([]);
+  const [users, setUsers] = useState<QMUser[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pageError, setPageError] = useState('');
   const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'users' | 'submissions'>('manage');
 
-  // Form State (no placeholders)
+  // Form State
   const [title, setTitle] = useState('');
   const [questionText, setQuestionText] = useState('');
   const [hintCount, setHintCount] = useState<1 | 2 | 3>(3);
@@ -49,64 +42,59 @@ export function QuizmasterDashboard({
   const [answer, setAnswer] = useState('');
   const [funda, setFunda] = useState('');
   const [formMsg, setFormMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const activeQId = questions.find(q => q.status === 'active')?.id ?? null;
+
+  const loadAll = async () => {
+    setLoading(true);
+    setPageError('');
+    const [q, u, s] = await Promise.all([
+      apiFetch<{ questions?: QMQuestion[] }>('/api/qm/questions'),
+      apiFetch<{ users?: QMUser[] }>('/api/qm/users'),
+      apiFetch<{ submissions?: Submission[] }>('/api/qm/submissions'),
+    ]);
+    if (q.ok) setQuestions(q.data.questions ?? []);
+    if (u.ok) setUsers(u.data.users ?? []);
+    if (s.ok) setSubmissions(s.data.submissions ?? []);
+    const firstErr = [q, u, s].find(r => !r.ok);
+    if (firstErr) setPageError(firstErr.data.error ?? 'Could not load data.');
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (isOpen) loadAll();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleCreateQuestion = (e: React.FormEvent) => {
+  const handleCreateQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormMsg('');
 
-    if (!title.trim()) {
-      setFormMsg('Question title is empty. Please enter a title.');
-      return;
-    }
-    if (!questionText.trim()) {
-      setFormMsg('Question text is empty. Please enter the question prompt.');
-      return;
-    }
-    if (!hintDifficult.trim()) {
-      setFormMsg('Hint 1 is empty. Please provide at least the first clue.');
-      return;
-    }
-    if (hintCount >= 2 && !hintMedium.trim()) {
-      setFormMsg('Hint 2 is empty. Please provide the medium clue.');
-      return;
-    }
-    if (hintCount === 3 && !hintEasy.trim()) {
-      setFormMsg('Hint 3 is empty. Please provide the easiest clue.');
-      return;
-    }
-    if (!answer.trim()) {
-      setFormMsg('Canonical answer is empty. Please provide the answer.');
-      return;
-    }
+    if (!title.trim()) return setFormMsg('Question title is empty. Please enter a title.');
+    if (!questionText.trim()) return setFormMsg('Question text is empty. Please enter the question prompt.');
+    if (!hintDifficult.trim()) return setFormMsg('Hint 1 is empty. Please provide at least the first clue.');
+    if (hintCount >= 2 && !hintMedium.trim()) return setFormMsg('Hint 2 is empty. Please provide the medium clue.');
+    if (hintCount === 3 && !hintEasy.trim()) return setFormMsg('Hint 3 is empty. Please provide the easiest clue.');
+    if (!answer.trim()) return setFormMsg('Canonical answer is empty. Please provide the answer.');
 
-    const currentQuestions = getStoredQuestions();
-    const nextEdition = currentQuestions.length > 0 
-      ? Math.max(...currentQuestions.map(q => q.edition)) + 1 
-      : 1;
-
-    const newQ: Question = {
-      id: `q-${Date.now()}`,
-      edition: nextEdition,
-      title: title.trim(),
-      questionText: questionText.trim(),
-      hints: {
-        difficult: hintDifficult.trim() || undefined,
-        medium: hintCount >= 2 ? (hintMedium.trim() || undefined) : undefined,
-        easy: hintCount === 3 ? (hintEasy.trim() || undefined) : undefined,
+    setSaving(true);
+    const res = await apiFetch('/api/qm/questions', {
+      method: 'POST',
+      body: {
+        title,
+        questionText,
+        hintDifficult,
+        hintMedium: hintCount >= 2 ? hintMedium : '',
+        hintEasy: hintCount === 3 ? hintEasy : '',
+        answer,
+        funda,
       },
-      answer: answer.trim(),
-      funda: funda.trim() || undefined,
-      fundaKeywords: funda ? funda.split(/[,;/|]/).map(k => k.trim()).filter(Boolean) : [],
-      status: 'draft',
-      date: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString(),
-    };
+    });
+    setSaving(false);
 
-    const updated = [newQ, ...currentQuestions];
-    saveStoredQuestions(updated);
-    setQuestions(updated);
+    if (!res.ok) return setFormMsg(res.data.error ?? 'Could not save the question.');
 
     setTitle('');
     setQuestionText('');
@@ -115,33 +103,31 @@ export function QuizmasterDashboard({
     setHintEasy('');
     setAnswer('');
     setFunda('');
-    setFormMsg('Question saved successfully to the dump!');
+    setFormMsg('');
+    await loadAll();
     setActiveTab('manage');
   };
 
-  const handleUploadQOTD = (questionId: string) => {
-    setActiveQuestionId(questionId);
-    setActiveQIdState(questionId);
-    setQuestions(getStoredQuestions());
+  const handleUploadQOTD = async (questionId: string) => {
+    const res = await apiFetch(`/api/qm/questions/${questionId}`, { method: 'PATCH' });
+    if (!res.ok) return setPageError(res.data.error ?? 'Could not activate the question.');
+    await loadAll();
     onQuestionActivated();
   };
 
-  const handleDeleteQuestion = (id: string) => {
-    if (confirm('Delete this question from repository?')) {
-      const updated = questions.filter(q => q.id !== id);
-      saveStoredQuestions(updated);
-      setQuestions(updated);
-    }
+  const handleDeleteQuestion = async (id: string) => {
+    if (!confirm('Delete this question from repository?')) return;
+    const res = await apiFetch(`/api/qm/questions/${id}`, { method: 'DELETE' });
+    if (!res.ok) return setPageError(res.data.error ?? 'Could not delete the question.');
+    await loadAll();
   };
 
-  const handleDeleteUserAccount = (userId: string, userName: string, userUid: string) => {
-    if (confirm(`Permanently delete account for ${userName} (${userUid})?`)) {
-      deleteUser(userId);
-      setUsers(getStoredUsers().filter(u => u.role === 'user'));
-    }
+  const handleDeleteUserAccount = async (userId: string, userName: string, userUid: string) => {
+    if (!confirm(`Permanently delete account for ${userName} (${userUid})?`)) return;
+    const res = await apiFetch(`/api/qm/users/${userId}`, { method: 'DELETE' });
+    if (!res.ok) return setPageError(res.data.error ?? 'Could not delete the user.');
+    await loadAll();
   };
-
-  const submissions = getStoredSubmissions();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
@@ -190,10 +176,7 @@ export function QuizmasterDashboard({
             <span>Add Question</span>
           </button>
           <button
-            onClick={() => {
-              setUsers(getStoredUsers().filter(u => u.role === 'user'));
-              setActiveTab('users');
-            }}
+            onClick={() => setActiveTab('users')}
             className={`btn-neo !py-1 !px-3 text-xs ${
               activeTab === 'users' ? 'btn-neo-yellow' : 'btn-neo-secondary'
             }`}
@@ -211,6 +194,12 @@ export function QuizmasterDashboard({
             <span>Submissions ({submissions.length})</span>
           </button>
         </div>
+
+        {(pageError || loading) && (
+          <div className={`mx-5 mt-4 p-3 rounded-xl border-[2px] border-[var(--ink)] text-xs font-bold text-[var(--ink)] ${pageError ? 'bg-[var(--red)]/20' : 'bg-[var(--paper-deep)]'}`}>
+            {pageError || 'Loading…'}
+          </div>
+        )}
 
         {/* Tab 1: Repository & Upload */}
         {activeTab === 'manage' && (
@@ -415,8 +404,8 @@ export function QuizmasterDashboard({
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button type="submit" className="btn-neo btn-neo-primary text-xs">
-                Save to Question Dump
+              <button type="submit" disabled={saving} className="btn-neo btn-neo-primary text-xs">
+                {saving ? 'Saving…' : 'Save to Question Dump'}
               </button>
             </div>
           </form>
@@ -452,6 +441,9 @@ export function QuizmasterDashboard({
                         <div className="font-mono text-xs text-[var(--red)] font-bold">
                           UID: {u.uid} • {u.points} ★ • {cw} CW ({u.correctCount}C / {u.wrongCount}W)
                         </div>
+                        <div className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                          {u.designation ?? '—'} • {u.branch ?? '—'} • Year {u.year ?? '—'}
+                        </div>
                       </div>
                     </div>
 
@@ -477,7 +469,7 @@ export function QuizmasterDashboard({
                 No submissions recorded yet.
               </div>
             ) : (
-              submissions.slice().reverse().map(sub => (
+              submissions.map(sub => (
                 <div
                   key={sub.id}
                   className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs flex items-center justify-between shadow-[2px_2px_0_var(--ink)]"
@@ -497,7 +489,7 @@ export function QuizmasterDashboard({
                       )}
                     </div>
                     <div className="font-mono text-[11px] text-[var(--text-secondary)] mt-0.5">
-                      Guess: &quot;{sub.guess}&quot;
+                      {sub.edition !== null && <span>Ed. #{sub.edition} • </span>}Guess: &quot;{sub.guess}&quot;
                     </div>
                   </div>
                   <div className="font-mono text-[10px] text-[var(--text-muted)]">

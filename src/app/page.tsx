@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Header } from '@/components/Header';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -9,16 +9,18 @@ import { HowToPlayModal } from '@/components/HowToPlayModal';
 import { AuthModal } from '@/components/AuthModal';
 import { QuizmasterDashboard } from '@/components/QuizmasterDashboard';
 import { ShareModal } from '@/components/ShareModal';
-import { getActiveQuestion } from '@/lib/storage';
-import { Question, HintTier } from '@/types';
+import { ProfileCompleteModal } from '@/components/ProfileCompleteModal';
+import { apiFetch } from '@/lib/api';
+import { QotdState, HintTier } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { LogIn, UserPlus, Trophy, Flame } from 'lucide-react';
 
 export default function HomePage() {
-  const { isQM, currentUser } = useAuth();
+  const { isQM, currentUser, loading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'quiz' | 'leaderboard'>('quiz');
-  const [question, setQuestion] = useState<Question>(() => getActiveQuestion());
+  const [qotd, setQotd] = useState<QotdState | null>(null);
+  const [qotdLoading, setQotdLoading] = useState(true);
 
   // Modal states
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
@@ -31,13 +33,17 @@ export default function HomePage() {
   const [sharePoints, setSharePoints] = useState(100);
   const [shareHints, setShareHints] = useState<HintTier[]>([]);
 
-  const refreshActiveQuestion = () => {
-    setQuestion(getActiveQuestion());
-  };
+  // The active question and this user's progress on it both come from the database.
+  const refreshActiveQuestion = useCallback(async () => {
+    const res = await apiFetch<{ state?: QotdState }>('/api/qotd');
+    if (res.ok && res.data.state) setQotd(res.data.state);
+    setQotdLoading(false);
+  }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     refreshActiveQuestion();
-  }, []);
+  }, [authLoading, currentUser?.id, refreshActiveQuestion]);
 
   const handleOpenQM = () => {
     if (isQM) {
@@ -94,6 +100,8 @@ export default function HomePage() {
         <main className="w-full">
           {activeTab === 'leaderboard' ? (
             <LeaderboardView />
+          ) : authLoading ? (
+            <div className="card-neo p-10 text-center text-xs font-bold text-[var(--text-muted)]">Loading…</div>
           ) : !currentUser ? (
             /* LANDING PAGE: ASK LOGIN OR SIGNUP */
             <div className="card-neo p-8 md:p-12 text-center bg-[var(--bg-secondary)] space-y-6">
@@ -111,7 +119,7 @@ export default function HomePage() {
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] text-xs font-black uppercase">
                   <Flame className="w-3.5 h-3.5 fill-[var(--ink)]" />
-                  <span>Edition #{question.edition} is Live</span>
+                  <span>{qotd?.question ? `Edition #${qotd.question.edition} is Live` : 'Question of the Day'}</span>
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[var(--ink)]">
                   Welcome to Quiz Club KLS GIT
@@ -159,10 +167,30 @@ export default function HomePage() {
             </div>
           ) : (
             /* Logged-in user sees Today's Quiz */
-            <QuestionCard
-              question={question}
-              onOpenShareModal={handleOpenShare}
-            />
+            isQM ? (
+              <div className="card-neo p-8 text-center bg-[var(--bg-secondary)] space-y-2">
+                <h2 className="text-xl font-extrabold text-[var(--ink)]">You are signed in as Quizmaster</h2>
+                <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                  Open the QM Console to manage questions. Sign in with a student account to play.
+                </p>
+              </div>
+            ) : qotdLoading ? (
+              <div className="card-neo p-10 text-center text-xs font-bold text-[var(--text-muted)]">Loading today&apos;s question…</div>
+            ) : qotd?.question ? (
+              <QuestionCard
+                key={qotd.question.id}
+                qotd={qotd}
+                onChange={setQotd}
+                onOpenShareModal={handleOpenShare}
+              />
+            ) : (
+              <div className="card-neo p-10 text-center bg-[var(--bg-secondary)] space-y-2">
+                <h2 className="text-xl font-extrabold text-[var(--ink)]">No question yet</h2>
+                <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                  The Quizmaster hasn&apos;t published today&apos;s question. Check back soon!
+                </p>
+              </div>
+            )
           )}
         </main>
       </div>
@@ -214,13 +242,18 @@ export default function HomePage() {
         }}
       />
 
-      <ShareModal
-        isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-        question={question}
-        pointsAwarded={sharePoints}
-        hintsUsed={shareHints}
-      />
+      {qotd?.question && (
+        <ShareModal
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          question={qotd.question}
+          pointsAwarded={sharePoints}
+          hintsUsed={shareHints}
+        />
+      )}
+
+      {/* Existing members must give year / branch / designation once */}
+      <ProfileCompleteModal />
     </div>
   );
 }
