@@ -1,6 +1,6 @@
 import { db } from '@/lib/server/db';
 import { fail, freshUser, handle, json, requireUser } from '@/lib/server/helpers';
-import { buildState, getActiveQuestion } from '@/lib/server/qotd';
+import { buildState, getActiveQuestion, maxAttemptsFor } from '@/lib/server/qotd';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +23,14 @@ export const POST = handle(async () => {
     p_correct: false,
     p_score: 0,
     p_feedback: 'Participant revealed the solution.',
+    p_forfeit: true,
+    p_max_attempts: maxAttemptsFor(q),
   });
 
   if (error) {
-    if (error.code === '23505') return fail('You have already attempted today\'s question.', 409, { state: await buildState(me.id) });
+    if (/already_finished|no_attempts_left|23505/.test(`${error.message} ${error.code}`)) {
+      return fail('You have already finished this question.', 409, { state: await buildState(me.id) });
+    }
     throw error;
   }
 

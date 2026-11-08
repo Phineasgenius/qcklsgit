@@ -65,6 +65,15 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
             </div>
           </div>
 
+          {/* Attempts */}
+          <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--teal)]/20 shadow-[2px_2px_0_var(--ink)] space-y-1">
+            <h4 className="font-black text-xs uppercase text-[var(--ink)]">Attempts</h4>
+            <p className="text-xs text-[var(--ink)]">
+              You get <strong>one attempt per clue, plus one</strong>. A question with 3 clues gives you 4 attempts. Solve it on any of them for the points
+              (reduced if you opened clues). Answer correctly every day to build a <strong>streak</strong>.
+            </p>
+          </div>
+
           {/* Expected Funda */}
           <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--lilac)]/25 shadow-[2px_2px_0_var(--ink)] space-y-1">
             <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">

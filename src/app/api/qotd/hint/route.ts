@@ -17,9 +17,8 @@ export const POST = handle(async (req) => {
   if (!q) return fail('There is no active question right now.', 404);
   if (!hintText(q, tier)) return fail('This clue does not exist for the question.');
 
-  const existing = await db()
-    .from('submissions').select('id').eq('user_id', me.id).eq('question_id', q.id).maybeSingle();
-  if (existing.data) return fail('You have already attempted this question.', 409, { state: await buildState(me.id) });
+  const current = await buildState(me.id);
+  if (current.result) return fail('You have already finished this question.', 409, { state: current });
 
   const { error } = await db()
     .from('hint_unlocks')

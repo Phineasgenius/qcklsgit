@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import Image from 'next/image';
+import Link from 'next/link';
 import { 
   HelpCircle, 
   User as UserIcon, 
@@ -141,7 +142,11 @@ export function Header({
           {/* User Sign In / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)] text-xs font-bold">
+              <Link
+                href={currentUser.role === 'user' ? '/profile' : '/'}
+                title={currentUser.role === 'user' ? 'My profile & stats' : undefined}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] shadow-[2px_2px_0_var(--ink)] text-xs font-bold hover:bg-[var(--paper-deep)] transition-colors"
+              >
                 <div className="w-5 h-5 rounded-full bg-[var(--yellow)] border border-[var(--ink)] flex items-center justify-center text-[10px]">
                   {currentUser.name.charAt(0).toUpperCase()}
                 </div>
@@ -154,7 +159,7 @@ export function Header({
                     {currentUser.points}★
                   </span>
                 )}
-              </div>
+              </Link>
 
               {/* Logout button */}
               <button

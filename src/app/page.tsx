@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { QuestionCard } from '@/components/QuestionCard';
 import { LeaderboardView } from '@/components/LeaderboardView';
@@ -85,10 +86,22 @@ export default function HomePage() {
               <span className="font-extrabold text-[var(--ink)]">Signed in as {currentUser.name}</span>
               <span className="font-mono text-[var(--red)] font-bold">({currentUser.uid})</span>
             </div>
-            <div className="flex items-center gap-3 font-mono font-bold">
+            <div className="flex items-center gap-3 font-mono font-bold flex-wrap">
+              {qotd?.streak && currentUser.role === 'user' && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--ink)] border border-[var(--ink)]"
+                  title={`Best streak: ${qotd.streak.best} days`}
+                >
+                  <Flame className="w-3.5 h-3.5 text-[var(--red)] fill-[var(--red)]" />
+                  {qotd.streak.current}-day streak
+                </span>
+              )}
               <span className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[var(--ink)] border border-[var(--ink)]">
                 {currentUser.points} ★ Points
               </span>
+              {currentUser.role === 'user' && (
+                <Link href="/profile" className="underline text-[var(--text-secondary)] hover:text-[var(--ink)]">Profile</Link>
+              )}
               <span className="text-[var(--text-secondary)]">
                 CW: {currentUser.wrongCount === 0 ? currentUser.correctCount : (currentUser.correctCount / currentUser.wrongCount).toFixed(2)}
               </span>

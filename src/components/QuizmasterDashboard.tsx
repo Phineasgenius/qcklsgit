@@ -122,6 +122,16 @@ export function QuizmasterDashboard({
     await loadAll();
   };
 
+  const handleResetPassword = async (userId: string, userName: string) => {
+    const pw = window.prompt(`Set a temporary password for ${userName} (min 6 characters). Tell them to change it on their profile page.`);
+    if (pw === null) return;
+    if (pw.length < 6) return setPageError('Password must be at least 6 characters.');
+    const res = await apiFetch(`/api/qm/users/${userId}`, { method: 'PATCH', body: { password: pw } });
+    if (!res.ok) return setPageError(res.data.error ?? 'Could not reset the password.');
+    setPageError('');
+    alert(`Password for ${userName} has been reset.`);
+  };
+
   const handleDeleteUserAccount = async (userId: string, userName: string, userUid: string) => {
     if (!confirm(`Permanently delete account for ${userName} (${userUid})?`)) return;
     const res = await apiFetch(`/api/qm/users/${userId}`, { method: 'DELETE' });
@@ -290,7 +300,7 @@ export function QuizmasterDashboard({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter question title"
+                  placeholder="e.g. Ledgers & Lakshmi"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
                 />
               </div>
@@ -324,7 +334,7 @@ export function QuizmasterDashboard({
                 rows={3}
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Enter question prompt"
+                placeholder="Write the full question here…"
                 className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
               />
             </div>
@@ -338,7 +348,7 @@ export function QuizmasterDashboard({
                 type="text"
                 value={hintDifficult}
                 onChange={(e) => setHintDifficult(e.target.value)}
-                placeholder="Enter toughest clue"
+                placeholder="Hardest clue, barely gives it away"
                 className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
               />
             </div>
@@ -353,7 +363,7 @@ export function QuizmasterDashboard({
                   type="text"
                   value={hintMedium}
                   onChange={(e) => setHintMedium(e.target.value)}
-                  placeholder="Enter medium clue"
+                  placeholder="A clearer clue"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
@@ -369,7 +379,7 @@ export function QuizmasterDashboard({
                   type="text"
                   value={hintEasy}
                   onChange={(e) => setHintEasy(e.target.value)}
-                  placeholder="Enter easiest clue"
+                  placeholder="Near-giveaway clue"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
@@ -384,7 +394,7 @@ export function QuizmasterDashboard({
                   type="text"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Enter correct answer"
+                  placeholder="e.g. Muhurat Trading"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
                 />
               </div>
@@ -397,7 +407,7 @@ export function QuizmasterDashboard({
                   type="text"
                   value={funda}
                   onChange={(e) => setFunda(e.target.value)}
-                  placeholder="Enter expected funda / concept (optional)"
+                  placeholder="e.g. Muhurat (also accepted)"
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
@@ -447,6 +457,13 @@ export function QuizmasterDashboard({
                       </div>
                     </div>
 
+                    <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResetPassword(u.id, u.name)}
+                      className="btn-neo btn-neo-secondary !py-1.5 !px-3 text-xs"
+                    >
+                      <span>Reset Password</span>
+                    </button>
                     <button
                       onClick={() => handleDeleteUserAccount(u.id, u.name, u.uid)}
                       className="btn-neo btn-neo-secondary !py-1.5 !px-3 text-xs text-[var(--red)]"
@@ -454,6 +471,7 @@ export function QuizmasterDashboard({
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Delete User</span>
                     </button>
+                    </div>
                   </div>
                 );
               })

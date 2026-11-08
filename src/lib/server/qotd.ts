@@ -1,5 +1,6 @@
 import { db } from './db';
-import type { HintTier, QotdState } from '@/types';
+import { streaksFor } from './board';
+import type { HintTier, QotdState, QotdAttempt } from '@/types';
 
 export interface QuestionRow {
   id: string;
@@ -17,11 +18,26 @@ export interface QuestionRow {
   created_at: string;
 }
 
+interface AttemptRow {
+  attempt_no: number;
+  guess: string;
+  is_correct: boolean;
+  is_forfeit: boolean;
+  points_awarded: number;
+  match_feedback: string | null;
+  hints_unlocked: HintTier[] | null;
+}
+
 export const TIERS: HintTier[] = ['difficult', 'medium', 'easy'];
 
 export function hintText(q: QuestionRow, tier: HintTier): string | null {
   const v = tier === 'difficult' ? q.hint_difficult : tier === 'medium' ? q.hint_medium : q.hint_easy;
   return v && v.trim() ? v : null;
+}
+
+/** One attempt for each clue, plus one. */
+export function maxAttemptsFor(q: QuestionRow): number {
+  return TIERS.filter((t) => hintText(q, t) !== null).length + 1;
 }
 
 /** 100 with no hints; otherwise capped by the easiest clue that was revealed. */
@@ -44,9 +60,14 @@ function istDate(iso: string | null): string {
 
 export async function buildState(userId: string | null): Promise<QotdState> {
   const q = await getActiveQuestion();
-  if (!q) return { question: null, unlockedHints: {}, submission: null, solution: null };
+  const empty: QotdState = {
+    question: null, maxAttempts: 0, attempts: [], unlockedHints: {}, result: null, solution: null, streak: null,
+  };
+  if (!q) return empty;
 
+  const max = maxAttemptsFor(q);
   const state: QotdState = {
+    ...empty,
     question: {
       id: q.id,
       edition: q.edition,
@@ -55,38 +76,42 @@ export async function buildState(userId: string | null): Promise<QotdState> {
       date: istDate(q.published_at),
       availableHints: TIERS.filter((t) => hintText(q, t) !== null),
     },
-    unlockedHints: {},
-    submission: null,
-    solution: null,
+    maxAttempts: max,
   };
 
   if (!userId) return state;
 
-  const [unlocks, sub] = await Promise.all([
+  const [unlocks, subs, streaks] = await Promise.all([
     db().from('hint_unlocks').select('tier').eq('user_id', userId).eq('question_id', q.id),
-    db().from('submissions').select('*').eq('user_id', userId).eq('question_id', q.id).maybeSingle(),
+    db().from('submissions').select('*').eq('user_id', userId).eq('question_id', q.id).order('attempt_no', { ascending: true }),
+    streaksFor([userId]),
   ]);
 
   for (const row of (unlocks.data ?? []) as { tier: HintTier }[]) {
     const text = hintText(q, row.tier);
     if (text) state.unlockedHints[row.tier] = text;
   }
+  state.streak = streaks.get(userId) ?? { current: 0, best: 0 };
 
-  if (sub.data) {
-    const s = sub.data as {
-      is_correct: boolean;
-      points_awarded: number;
-      guess: string;
-      match_feedback: string | null;
-      hints_unlocked: HintTier[] | null;
-    };
-    state.submission = {
-      isCorrect: s.is_correct,
-      pointsAwarded: s.points_awarded,
-      guess: s.guess,
-      feedback: s.match_feedback ?? '',
-      forfeited: s.guess === '[Forfeited]',
-      hintsUnlocked: s.hints_unlocked ?? [],
+  const rows = (subs.data ?? []) as AttemptRow[];
+  state.attempts = rows.map<QotdAttempt>((r) => ({
+    guess: r.guess,
+    isCorrect: r.is_correct,
+    forfeited: r.is_forfeit,
+    feedback: r.match_feedback ?? '',
+  }));
+
+  const solved = rows.find((r) => r.is_correct);
+  const forfeit = rows.find((r) => r.is_forfeit);
+  const exhausted = rows.length >= max;
+
+  if (solved || forfeit || exhausted) {
+    const last = rows[rows.length - 1];
+    state.result = {
+      status: solved ? 'solved' : forfeit ? 'forfeited' : 'failed',
+      pointsAwarded: solved ? solved.points_awarded : 0,
+      feedback: last?.match_feedback ?? '',
+      hintsUnlocked: (solved?.hints_unlocked ?? (Object.keys(state.unlockedHints) as HintTier[])),
     };
     state.solution = { answer: q.answer, funda: q.funda ?? undefined };
   }

@@ -13,12 +13,20 @@ export interface ProfileInput {
   year: string;
   branch: string;
   designation: string;
+  name?: string;
+  securityQuestion?: string;
+  securityAnswer?: string;
 }
 
-export interface RegisterInput extends ProfileInput {
+export interface RegisterInput {
   name: string;
   uid: string;
   password: string;
+  year: string;
+  branch: string;
+  designation: string;
+  securityQuestion: string;
+  securityAnswer: string;
 }
 
 interface AuthContextType {

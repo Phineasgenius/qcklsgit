@@ -2,256 +2,178 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
-import { LeaderboardEntry } from '@/types';
-import { 
-  Trophy, 
-  Search, 
-  Crown
-} from 'lucide-react';
+import { LeaderboardEntry, LeaderboardResponse } from '@/types';
+import { Crown, Flame } from 'lucide-react';
+
+type Sort = 'points' | 'cw';
+
+function Streak({ n }: { n: number }) {
+  if (n <= 0) return <span className="text-[10px] font-mono font-bold text-[var(--text-muted)]">—</span>;
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-mono font-black text-[var(--ink)]" title={`${n}-day streak`}>
+      <Flame className="w-3.5 h-3.5 text-[var(--red)] fill-[var(--red)]" />
+      {n}
+    </span>
+  );
+}
+
+function Podium({ p, place }: { p: LeaderboardEntry; place: 1 | 2 | 3 }) {
+  const medal = place === 1 ? 'var(--gold)' : place === 2 ? 'var(--silver)' : 'var(--bronze)';
+  const first = place === 1;
+  return (
+    <div
+      className={`card-neo card-neo-hover w-full ${first ? 'md:w-[290px] p-6 md:-translate-y-4 order-1 md:order-2' : `md:w-[260px] p-5 ${place === 2 ? 'order-2 md:order-1' : 'order-3'}`} flex flex-col items-center text-center relative bg-[var(--bg-secondary)]`}
+    >
+      <div
+        className={`${first ? 'w-10 h-10 -top-5' : 'w-8 h-8 -top-4'} rounded-full border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute shadow-[2px_2px_0_var(--ink)] text-[#1b1712]`}
+        style={{ background: medal }}
+      >
+        {first ? <Crown className="w-5 h-5 fill-[#1b1712] text-[#1b1712]" /> : place}
+      </div>
+      <div
+        className={`${first ? 'w-20 h-20 text-3xl' : 'w-16 h-16 text-2xl'} rounded-xl border-[2.5px] bg-[var(--paper-deep)] flex items-center justify-center font-black my-2 text-[var(--ink)]`}
+        style={{ borderColor: medal }}
+      >
+        {p.name.charAt(0)}
+      </div>
+      <h4 className={`font-extrabold ${first ? 'text-lg' : 'text-base'} text-[var(--ink)] truncate max-w-[220px]`}>{p.name}</h4>
+      <span className="text-xs font-mono font-bold text-[var(--text-muted)]">{p.uid}</span>
+      <div className={`font-mono ${first ? 'text-3xl' : 'text-2xl'} font-black text-[var(--ink)] my-2`}>{p.points} ★</div>
+      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
+        {p.cwRatio.toFixed(2)} CW ({p.correctCount}C / {p.wrongCount}W)
+      </span>
+      <div className="mt-2"><Streak n={p.streak} /></div>
+    </div>
+  );
+}
+
+function Row({ player, highlight }: { player: LeaderboardEntry; highlight: boolean }) {
+  const rankBg = player.rank === 1 ? 'bg-[var(--gold)]' : player.rank === 2 ? 'bg-[var(--silver)]' : player.rank === 3 ? 'bg-[var(--bronze)]' : 'bg-[var(--bg-secondary)]';
+  return (
+    <div className={`grid grid-cols-12 items-center px-5 py-3.5 transition-colors ${highlight ? 'bg-[var(--yellow)]/25' : 'hover:bg-[var(--paper)]'}`}>
+      <div className="col-span-2 sm:col-span-1">
+        <span className={`min-w-7 h-7 px-1 rounded-lg border-[1.5px] border-[var(--ink)] font-mono font-black text-xs flex items-center justify-center shadow-[1px_1px_0_var(--ink)] w-fit ${rankBg} ${player.rank <= 3 ? 'text-[#1b1712]' : 'text-[var(--ink)]'}`}>
+          #{player.rank}
+        </span>
+      </div>
+      <div className="col-span-6 sm:col-span-5 flex items-center gap-2.5 min-w-0">
+        <div className="w-8 h-8 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] flex items-center justify-center text-xs font-black shrink-0 text-[var(--ink)]">
+          {player.name.charAt(0)}
+        </div>
+        <div className="min-w-0">
+          <div className="font-extrabold text-sm text-[var(--ink)] truncate">
+            {player.name}
+            {highlight && <span className="ml-1.5 text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)]">YOU</span>}
+          </div>
+          <div className="font-mono text-[11px] font-bold text-[var(--red)]">{player.uid}</div>
+        </div>
+      </div>
+      <div className="hidden sm:block sm:col-span-2 text-center"><Streak n={player.streak} /></div>
+      <div className="col-span-4 sm:col-span-2 text-right">
+        <div className="font-mono font-black text-sm text-[var(--ink)]">{player.cwRatio.toFixed(2)} CW</div>
+        <div className="text-[10px] font-mono font-bold text-[var(--text-muted)]">{player.correctCount}C / {player.wrongCount}W</div>
+      </div>
+      <div className="hidden sm:block sm:col-span-2 text-right">
+        <span className="font-mono text-base font-black text-[var(--ink)]">{player.points}</span>
+        <span className="font-mono text-xs font-bold text-[var(--ink)] ml-0.5">★</span>
+      </div>
+    </div>
+  );
+}
 
 export function LeaderboardView() {
-  const [boardData, setBoardData] = useState<LeaderboardEntry[]>([]);
+  const [data, setData] = useState<LeaderboardResponse | null>(null);
+  const [sortBy, setSortBy] = useState<Sort>('points');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'points' | 'cw'>('points');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await apiFetch<{ entries?: LeaderboardEntry[] }>('/api/leaderboard');
+      setLoading(true);
+      const res = await apiFetch<Partial<LeaderboardResponse>>(`/api/leaderboard?sort=${sortBy}`);
       if (cancelled) return;
-      if (res.ok) setBoardData(res.data.entries ?? []);
-      else setLoadError(res.data.error ?? 'Could not load the leaderboard.');
+      if (res.ok) {
+        setData({ entries: res.data.entries ?? [], me: res.data.me ?? null, meId: res.data.meId ?? null, total: res.data.total ?? 0 });
+        setLoadError('');
+      } else {
+        setLoadError(res.data.error ?? 'Could not load the leaderboard.');
+      }
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sortBy]);
 
-  const filteredUsers = boardData
-    .filter(u => 
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.uid.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === 'points') {
-        if (b.points !== a.points) return b.points - a.points;
-        return b.correctCount - a.correctCount;
-      } else {
-        if (b.cwRatio !== a.cwRatio) return b.cwRatio - a.cwRatio;
-        return b.points - a.points;
-      }
-    });
-
-  const top1 = boardData.find(u => u.rank === 1);
-  const top2 = boardData.find(u => u.rank === 2);
-  const top3 = boardData.find(u => u.rank === 3);
+  const entries = data?.entries ?? [];
+  const top = (rank: number) => entries.find((e) => e.rank === rank);
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* 1. TOP 3 PODIUM SECTION */}
-      {boardData.length >= 3 && (
+      {entries.length >= 3 && (
         <div className="pt-2">
           <div className="text-center mb-6">
-            <h3 className="text-2xl font-black tracking-tight text-[var(--ink)]">
-              Top Quizzers Podium
-            </h3>
+            <h3 className="text-2xl font-black tracking-tight text-[var(--ink)]">Top Quizzers Podium</h3>
           </div>
-
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-5 items-end">
-            {/* 2nd Place (Silver) */}
-            {top2 && (
-              <div className="card-neo card-neo-hover w-full md:w-[260px] p-5 flex flex-col items-center text-center relative bg-[var(--bg-secondary)] order-2 md:order-1">
-                <div className="w-8 h-8 rounded-full bg-[var(--silver)] border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute -top-4 shadow-[2px_2px_0_var(--ink)] text-[var(--ink)]">
-                  2
-                </div>
-                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--silver)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2 text-[var(--ink)]">
-                  {top2.name.charAt(0)}
-                </div>
-                <h4 className="font-extrabold text-base text-[var(--ink)] truncate max-w-[200px]">
-                  {top2.name}
-                </h4>
-                <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
-                  {top2.uid}
-                </span>
-                <div className="font-mono text-2xl font-black text-[var(--ink)] my-2">
-                  {top2.points} ★
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-                  {top2.cwRatio.toFixed(2)} CW ({top2.correctCount}C / {top2.wrongCount}W)
-                </span>
-              </div>
-            )}
-
-            {/* 1st Place (Gold) */}
-            {top1 && (
-              <div className="card-neo card-neo-hover w-full md:w-[290px] p-6 flex flex-col items-center text-center relative bg-[var(--bg-secondary)] border-[3px] border-[var(--ink)] shadow-[10px_10px_0_var(--ink)] order-1 md:order-2 md:-translate-y-4">
-                <div className="w-10 h-10 rounded-full bg-[var(--gold)] border-[2.5px] border-[var(--ink)] font-black text-base flex items-center justify-center absolute -top-5 shadow-[3px_3px_0_var(--ink)] text-[var(--ink)]">
-                  <Crown className="w-5 h-5 fill-[var(--ink)] text-[var(--ink)]" />
-                </div>
-                <div className="w-20 h-20 rounded-xl border-[3px] border-[var(--gold)] bg-[var(--yellow)]/30 flex items-center justify-center text-3xl font-black my-2 text-[var(--ink)]">
-                  {top1.name.charAt(0)}
-                </div>
-                <h4 className="font-extrabold text-lg text-[var(--ink)] truncate max-w-[220px]">
-                  {top1.name}
-                </h4>
-                <span className="text-xs font-mono font-black text-[var(--red)]">
-                  {top1.uid}
-                </span>
-                <div className="font-mono text-3xl font-black text-[var(--ink)] my-2">
-                  {top1.points} ★
-                </div>
-                <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[var(--yellow)] text-[var(--ink)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
-                  {top1.cwRatio.toFixed(2)} CW Ratio ({top1.correctCount}C / {top1.wrongCount}W)
-                </span>
-              </div>
-            )}
-
-            {/* 3rd Place (Bronze) */}
-            {top3 && (
-              <div className="card-neo card-neo-hover w-full md:w-[260px] p-5 flex flex-col items-center text-center relative bg-[var(--bg-secondary)] order-3">
-                <div className="w-8 h-8 rounded-full bg-[var(--bronze)] border-[2px] border-[var(--ink)] font-black text-sm flex items-center justify-center absolute -top-4 shadow-[2px_2px_0_var(--ink)] text-[var(--ink)]">
-                  3
-                </div>
-                <div className="w-16 h-16 rounded-xl border-[2.5px] border-[var(--bronze)] bg-[var(--paper-deep)] flex items-center justify-center text-2xl font-black my-2 text-[var(--ink)]">
-                  {top3.name.charAt(0)}
-                </div>
-                <h4 className="font-extrabold text-base text-[var(--ink)] truncate max-w-[200px]">
-                  {top3.name}
-                </h4>
-                <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
-                  {top3.uid}
-                </span>
-                <div className="font-mono text-2xl font-black text-[var(--ink)] my-2">
-                  {top3.points} ★
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--paper-deep)] border-[1.5px] border-[var(--ink)]">
-                  {top3.cwRatio.toFixed(2)} CW ({top3.correctCount}C / {top3.wrongCount}W)
-                </span>
-              </div>
-            )}
+          <div className="flex flex-col md:flex-row justify-center gap-6 md:gap-5 md:items-end">
+            {top(2) && <Podium p={top(2)!} place={2} />}
+            {top(1) && <Podium p={top(1)!} place={1} />}
+            {top(3) && <Podium p={top(3)!} place={3} />}
           </div>
         </div>
       )}
 
-      {/* 2. SEARCH & SORT TOOLBAR (NO PLACEHOLDERS) */}
-      <div className="card-neo p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[var(--bg-secondary)]">
-        {/* Search */}
-        <div className="w-full sm:w-80 space-y-1">
-          <label className="text-[11px] font-extrabold uppercase text-[var(--text-secondary)]">
-            Search by Name or College UID
-          </label>
-          <div className="relative">
-            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or UID..."
-              className="w-full pl-10 pr-4 py-2 rounded-full border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-semibold focus:outline-none focus:shadow-[2px_2px_0_var(--ink)] placeholder:text-[var(--text-muted)] placeholder:font-normal"
-            />
-          </div>
+      <div className="card-neo p-4 flex items-center justify-between gap-4 bg-[var(--bg-secondary)] flex-wrap">
+        <div className="text-xs font-bold text-[var(--text-secondary)]">
+          Top 10 of {data?.total ?? 0} {data?.total === 1 ? 'member' : 'members'}
         </div>
-
-        {/* Sort controls */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-[var(--text-secondary)]">Sort by:</span>
           <div className="inline-flex rounded-full border-[2px] border-[var(--ink)] p-0.5 bg-[var(--paper)] shadow-[2px_2px_0_var(--ink)]">
-            <button
-              onClick={() => setSortBy('points')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                sortBy === 'points'
-                  ? 'bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] shadow-[1px_1px_0_var(--ink)]'
-                  : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              Points ★
-            </button>
-            <button
-              onClick={() => setSortBy('cw')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                sortBy === 'cw'
-                  ? 'bg-[var(--yellow)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] shadow-[1px_1px_0_var(--ink)]'
-                  : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              CW Ratio
-            </button>
+            {(['points', 'cw'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSortBy(s)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                  sortBy === s ? 'bg-[var(--yellow)] text-[#1b1712] border-[1.5px] border-[var(--ink)] shadow-[1px_1px_0_var(--ink)]' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                {s === 'points' ? 'Points ★' : 'CW Ratio'}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 3. LEADERBOARD LIST / TABLE */}
       <div className="card-neo overflow-hidden bg-[var(--bg-secondary)]">
-        {/* Table Head */}
         <div className="grid grid-cols-12 px-5 py-3 border-b-[2.5px] border-[var(--ink)] bg-[var(--paper-deep)] text-xs font-black uppercase tracking-wider text-[var(--ink)]">
           <span className="col-span-2 sm:col-span-1">Rank</span>
-          <span className="col-span-6 sm:col-span-6">Member & College UID</span>
-          <span className="col-span-4 sm:col-span-3 text-right">CW (Correct/Wrong)</span>
+          <span className="col-span-6 sm:col-span-5">Member</span>
+          <span className="hidden sm:block sm:col-span-2 text-center">Streak</span>
+          <span className="col-span-4 sm:col-span-2 text-right">CW</span>
           <span className="hidden sm:block sm:col-span-2 text-right">Points</span>
         </div>
 
-        {/* Table Body */}
         <div className="divide-y-[2px] divide-[var(--ink)]">
-          {loading ? (
+          {loading && !data ? (
             <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">Loading leaderboard…</div>
           ) : loadError ? (
             <div className="p-10 text-center text-xs font-bold text-[var(--red)]">{loadError}</div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">
-              {searchQuery ? `No participants found matching "${searchQuery}".` : 'No participants on the leaderboard yet.'}
-            </div>
+          ) : entries.length === 0 ? (
+            <div className="p-10 text-center text-xs font-bold text-[var(--text-muted)]">No participants on the leaderboard yet.</div>
           ) : (
-            filteredUsers.map((player) => (
-              <div
-                key={player.id}
-                className="grid grid-cols-12 items-center px-5 py-3.5 hover:bg-[var(--paper)] transition-colors"
-              >
-                {/* Rank */}
-                <div className="col-span-2 sm:col-span-1">
-                  <span className={`w-7 h-7 rounded-lg border-[1.5px] border-[var(--ink)] font-mono font-black text-xs flex items-center justify-center shadow-[1px_1px_0_var(--ink)] ${
-                    player.rank === 1 ? 'bg-[var(--gold)]' : player.rank === 2 ? 'bg-[var(--silver)]' : player.rank === 3 ? 'bg-[var(--bronze)]' : 'bg-[var(--bg-secondary)]'
-                  }`}>
-                    #{player.rank}
-                  </span>
-                </div>
-
-                {/* Name & UID */}
-                <div className="col-span-6 sm:col-span-6 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] flex items-center justify-center text-xs font-black shrink-0 text-[var(--ink)]">
-                    {player.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="font-extrabold text-sm text-[var(--ink)] truncate">
-                      {player.name}
-                    </div>
-                    <div className="font-mono text-[11px] font-bold text-[var(--red)]">
-                      {player.uid}
-                    </div>
-                  </div>
-                </div>
-
-                {/* CW Ratio */}
-                <div className="col-span-4 sm:col-span-3 text-right">
-                  <div className="font-mono font-black text-sm text-[var(--ink)]">
-                    {player.cwRatio.toFixed(2)} CW
-                  </div>
-                  <div className="text-[10px] font-mono font-bold text-[var(--text-muted)]">
-                    {player.correctCount}C / {player.wrongCount}W
-                  </div>
-                </div>
-
-                {/* Points */}
-                <div className="hidden sm:block sm:col-span-2 text-right">
-                  <span className="font-mono text-base font-black text-[var(--ink)]">
-                    {player.points}
-                  </span>
-                  <span className="font-mono text-xs font-bold text-[var(--ink)] ml-0.5">★</span>
-                </div>
-              </div>
-            ))
+            <>
+              {entries.map((p) => (
+                <Row key={p.id} player={p} highlight={p.id === data?.meId} />
+              ))}
+              {data?.me && (
+                <>
+                  <div className="py-1.5 text-center text-xs font-black tracking-widest text-[var(--text-muted)] bg-[var(--paper-deep)]">• • •</div>
+                  <Row player={data.me} highlight />
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

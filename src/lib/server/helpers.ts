@@ -16,6 +16,10 @@ export interface ProfileRow {
   year: string | null;
   branch: string | null;
   designation: string | null;
+  security_question: string | null;
+  security_answer_hash: string | null;
+  reset_fails: number;
+  reset_locked_until: string | null;
   created_at: string;
 }
 
@@ -70,7 +74,8 @@ export function toUser(p: ProfileRow): User {
     year: p.year,
     branch: p.branch,
     designation: p.designation,
-    needsProfile: p.role === 'user' && (!p.year || !p.branch || !p.designation),
+    securityQuestion: p.security_question,
+    needsProfile: p.role === 'user' && (!p.year || !p.branch || !p.designation || !p.security_question),
     createdAt: p.created_at,
   };
 }
