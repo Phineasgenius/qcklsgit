@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { QMQuestion, QMUser, Submission } from '@/types';
+import { HintTier, QMQuestion, QMUser, Submission } from '@/types';
 import { apiFetch } from '@/lib/api';
 import { 
   ShieldCheck, 
@@ -12,8 +12,16 @@ import {
   History,
   Layers,
   Users as UsersIcon,
-  Search
+  Search,
+  Check,
+  Lightbulb
 } from 'lucide-react';
+
+const HINT_CHIP: Record<HintTier, { label: string; cls: string }> = {
+  difficult: { label: 'Hint 1', cls: 'bg-[var(--coral)]' },
+  medium: { label: 'Hint 2', cls: 'bg-[var(--yellow)]' },
+  easy: { label: 'Hint 3', cls: 'bg-[var(--teal)]' },
+};
 
 interface QuizmasterDashboardProps {
   isOpen: boolean;
@@ -33,6 +41,7 @@ export function QuizmasterDashboard({
   const [pageError, setPageError] = useState('');
   const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'users' | 'submissions'>('manage');
   const [search, setSearch] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -146,6 +155,22 @@ export function QuizmasterDashboard({
     if (!confirm(`Permanently delete account for ${userName} (${userUid})?`)) return;
     const res = await apiFetch(`/api/qm/users/${userId}`, { method: 'DELETE' });
     if (!res.ok) return setPageError(res.data.error ?? 'Could not delete the user.');
+    await loadAll();
+  };
+
+  const handleOverride = async (sub: Submission) => {
+    const next = !sub.isCorrect;
+    const ok = confirm(
+      next
+        ? `Mark ${sub.userName}'s answer "${sub.guess}" as CORRECT?\n\nThey will get points based on the hints they used.`
+        : `Mark ${sub.userName}'s answer "${sub.guess}" as WRONG?\n\nThe points from this answer will be removed.`
+    );
+    if (!ok) return;
+    setBusyId(sub.id);
+    const res = await apiFetch(`/api/qm/submissions/${sub.id}`, { method: 'PATCH', body: { isCorrect: next } });
+    setBusyId(null);
+    if (!res.ok) return setPageError(res.data.error ?? 'Could not update the submission.');
+    setPageError('');
     await loadAll();
   };
 
@@ -558,34 +583,73 @@ export function QuizmasterDashboard({
                 No submissions match &quot;{search}&quot;.
               </div>
             ) : (
-              fs.map(sub => (
-                <div
-                  key={sub.id}
-                  className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs flex items-center justify-between shadow-[2px_2px_0_var(--ink)]"
-                >
-                  <div>
-                    <div className="font-extrabold text-[var(--ink)] flex items-center gap-2">
-                      <span>{sub.userName}</span>
-                      <span className="font-mono text-[10px] text-[var(--red)]">({sub.userUid})</span>
-                      {sub.isCorrect ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--teal)] border border-[var(--ink)]">
-                          CORRECT (+{sub.pointsAwarded}★)
+              fs.map(sub => {
+                const busy = busyId === sub.id;
+                return (
+                  <div
+                    key={sub.id}
+                    className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs flex items-center justify-between gap-3 shadow-[2px_2px_0_var(--ink)]"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-[var(--ink)] flex items-center gap-2 flex-wrap">
+                        <span>{sub.userName}</span>
+                        <span className="font-mono text-[10px] text-[var(--red)]">({sub.userUid})</span>
+                        {sub.forfeited ? (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--paper-deep)] border border-[var(--ink)]">
+                            FORFEIT
+                          </span>
+                        ) : sub.isCorrect ? (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--teal)] border border-[var(--ink)]">
+                            CORRECT (+{sub.pointsAwarded}★)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--red)] text-white border border-[var(--ink)]">
+                            WRONG
+                          </span>
+                        )}
+                        {sub.overridden && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--lilac)] border border-[var(--ink)]">
+                            EDITED BY QM
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono text-[11px] text-[var(--text-secondary)] mt-0.5 break-words">
+                        {sub.edition !== null && <span>Ed. #{sub.edition} • </span>}
+                        Attempt {sub.attemptNo} • Guess: &quot;{sub.guess}&quot;
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <Lightbulb className="w-3.5 h-3.5 text-[var(--ink)]" />
+                        <span className="text-[10px] font-black uppercase text-[var(--text-secondary)]">
+                          Hints used: {sub.hintsUsed.length}
                         </span>
-                      ) : (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--red)] text-white border border-[var(--ink)]">
-                          WRONG
-                        </span>
+                        {sub.hintsUsed.map((h) => (
+                          <span
+                            key={h}
+                            className={`text-[10px] font-black px-1.5 py-0.5 rounded border border-[var(--ink)] text-[var(--ink)] ${HINT_CHIP[h].cls}`}
+                          >
+                            {HINT_CHIP[h].label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="font-mono text-[10px] text-[var(--text-muted)]">
+                        {new Date(sub.timestamp).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {!sub.forfeited && (
+                        <button
+                          onClick={() => handleOverride(sub)}
+                          disabled={busy}
+                          className={`btn-neo btn-neo-secondary !py-1 !px-2.5 text-[11px] ${sub.isCorrect ? 'text-[var(--red)]' : ''}`}
+                        >
+                          {sub.isCorrect ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                          <span>{busy ? 'Saving…' : sub.isCorrect ? 'Mark wrong' : 'Mark correct'}</span>
+                        </button>
                       )}
                     </div>
-                    <div className="font-mono text-[11px] text-[var(--text-secondary)] mt-0.5">
-                      {sub.edition !== null && <span>Ed. #{sub.edition} • </span>}Guess: &quot;{sub.guess}&quot;
-                    </div>
                   </div>
-                  <div className="font-mono text-[10px] text-[var(--text-muted)]">
-                    {new Date(sub.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
