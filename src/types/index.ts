@@ -92,6 +92,8 @@ export interface LeaderboardResponse {
   me: LeaderboardEntry | null;
   meId: string | null;
   total: number;
+  /** set when the response is a search result instead of the top 10 */
+  query?: string;
 }
 
 export interface ProfileStats {

@@ -11,7 +11,8 @@ import {
   X,
   History,
   Layers,
-  Users as UsersIcon
+  Users as UsersIcon,
+  Search
 } from 'lucide-react';
 
 interface QuizmasterDashboardProps {
@@ -31,6 +32,7 @@ export function QuizmasterDashboard({
   const [loading, setLoading] = useState(false);
   const [pageError, setPageError] = useState('');
   const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'users' | 'submissions'>('manage');
+  const [search, setSearch] = useState('');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -63,8 +65,16 @@ export function QuizmasterDashboard({
   };
 
   useEffect(() => {
-    if (isOpen) loadAll();
+    if (isOpen) {
+      setSearch('');
+      loadAll();
+    }
   }, [isOpen]);
+
+  const switchTab = (t: 'manage' | 'new' | 'users' | 'submissions') => {
+    setSearch('');
+    setActiveTab(t);
+  };
 
   if (!isOpen) return null;
 
@@ -139,6 +149,51 @@ export function QuizmasterDashboard({
     await loadAll();
   };
 
+  const term = search.trim().toLowerCase();
+  const has = (...parts: (string | number | null | undefined)[]) =>
+    parts.map((p) => String(p ?? '')).join(' ').toLowerCase().includes(term);
+
+  const fq = term
+    ? questions.filter((q) => has(q.title, q.questionText, q.answer, q.funda, q.status, q.edition, `#${q.edition}`, `ed ${q.edition}`))
+    : questions;
+  const fu = term
+    ? users.filter((u) => has(u.name, u.uid, u.branch, u.year, u.designation, `${u.year} year`))
+    : users;
+  const fs = term
+    ? submissions.filter((s) => has(s.userName, s.userUid, s.guess, s.edition, `#${s.edition}`, `ed ${s.edition}`, s.isCorrect ? 'correct' : 'wrong'))
+    : submissions;
+
+  const searchBar = (placeholder: string, shown: number, total: number) => (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search className="w-4 h-4 text-[var(--ink)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={placeholder}
+          aria-label="Search"
+          className="w-full pl-10 pr-9 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] text-xs font-semibold text-[var(--ink)] shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:font-normal"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--ink)]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      {term && (
+        <div className="text-[11px] font-bold text-[var(--text-secondary)]">
+          Showing {shown} of {total}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div className="card-neo w-full max-w-4xl max-h-[92vh] flex flex-col bg-[var(--bg-secondary)] overflow-hidden">
@@ -168,7 +223,7 @@ export function QuizmasterDashboard({
         {/* Tab Switcher */}
         <div className="p-3 border-b-[2px] border-[var(--ink)] flex items-center gap-2 bg-[var(--paper)] flex-wrap">
           <button
-            onClick={() => setActiveTab('manage')}
+            onClick={() => switchTab('manage')}
             className={`btn-neo !py-1 !px-3 text-xs ${
               activeTab === 'manage' ? 'btn-neo-yellow' : 'btn-neo-secondary'
             }`}
@@ -177,7 +232,7 @@ export function QuizmasterDashboard({
             <span>Repository ({questions.length})</span>
           </button>
           <button
-            onClick={() => setActiveTab('new')}
+            onClick={() => switchTab('new')}
             className={`btn-neo !py-1 !px-3 text-xs ${
               activeTab === 'new' ? 'btn-neo-yellow' : 'btn-neo-secondary'
             }`}
@@ -186,7 +241,7 @@ export function QuizmasterDashboard({
             <span>Add Question</span>
           </button>
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => switchTab('users')}
             className={`btn-neo !py-1 !px-3 text-xs ${
               activeTab === 'users' ? 'btn-neo-yellow' : 'btn-neo-secondary'
             }`}
@@ -195,7 +250,7 @@ export function QuizmasterDashboard({
             <span>Manage Users ({users.length})</span>
           </button>
           <button
-            onClick={() => setActiveTab('submissions')}
+            onClick={() => switchTab('submissions')}
             className={`btn-neo !py-1 !px-3 text-xs ${
               activeTab === 'submissions' ? 'btn-neo-yellow' : 'btn-neo-secondary'
             }`}
@@ -214,12 +269,17 @@ export function QuizmasterDashboard({
         {/* Tab 1: Repository & Upload */}
         {activeTab === 'manage' && (
           <div className="overflow-y-auto p-5 flex-1 space-y-3">
+            {questions.length > 0 && searchBar('Search questions by title, text, answer or edition...', fq.length, questions.length)}
             {questions.length === 0 ? (
               <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
                 Repository is empty. Add a question using the &quot;Add Question&quot; tab.
               </div>
+            ) : fq.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
+                No questions match &quot;{search}&quot;.
+              </div>
             ) : (
-              questions.map((q) => {
+              fq.map((q) => {
                 const isActive = q.id === activeQId;
 
                 return (
@@ -428,12 +488,18 @@ export function QuizmasterDashboard({
               Registered Student Accounts ({users.length}) — Delete accounts when required.
             </div>
 
+            {users.length > 0 && searchBar('Search members by name, UID, branch, year or designation...', fu.length, users.length)}
+
             {users.length === 0 ? (
               <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
                 No registered student accounts found.
               </div>
+            ) : fu.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
+                No members match &quot;{search}&quot;.
+              </div>
             ) : (
-              users.map((u) => {
+              fu.map((u) => {
                 const cw = u.wrongCount === 0 ? u.correctCount : (u.correctCount / u.wrongCount).toFixed(2);
                 return (
                   <div
@@ -482,12 +548,17 @@ export function QuizmasterDashboard({
         {/* Tab 4: Submissions */}
         {activeTab === 'submissions' && (
           <div className="overflow-y-auto p-5 flex-1 space-y-2">
+            {submissions.length > 0 && searchBar('Search submissions by name, UID, answer, edition, correct/wrong...', fs.length, submissions.length)}
             {submissions.length === 0 ? (
               <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
                 No submissions recorded yet.
               </div>
+            ) : fs.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-[var(--text-muted)]">
+                No submissions match &quot;{search}&quot;.
+              </div>
             ) : (
-              submissions.map(sub => (
+              fs.map(sub => (
                 <div
                   key={sub.id}
                   className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs flex items-center justify-between shadow-[2px_2px_0_var(--ink)]"

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 import { LeaderboardEntry, LeaderboardResponse } from '@/types';
-import { Award, Target, Flame, Search } from 'lucide-react';
+import { Award, Target, Flame, Search, X } from 'lucide-react';
 import styles from './LeaderboardView.module.css';
 
 type Sort = 'points' | 'cw';
@@ -15,8 +15,6 @@ function PodiumCard({ user, rank }: { user: LeaderboardEntry; rank: 1 | 2 | 3 })
   return (
     <div className={`${styles.podiumCard} ${medal} ${rank === 1 ? styles.podiumCardFirst : ''}`}>
       <div className={styles.podiumBadge}>{ordinal(rank)}</div>
-
-      <div className={styles.podiumAvatar}>{user.name.charAt(0).toUpperCase()}</div>
 
       <div className={styles.podiumUserInfo}>
         <h3 className={styles.podiumName}>{user.name}</h3>
@@ -61,15 +59,12 @@ function TableRow({ player, isMe }: { player: LeaderboardEntry; isMe: boolean })
         <span className={`${styles.rankNumber} ${rankCls}`}>{player.rank}</span>
       </td>
       <td>
-        <div className={styles.userCell}>
-          <div className={styles.userAvatarSmall}>{player.name.charAt(0).toUpperCase()}</div>
-          <div className={styles.userNameBlock}>
-            <div className={styles.userDisplayName}>
-              <span className={styles.nameText}>{player.name}</span>
-              {isMe && <span className={styles.youTag}>YOU</span>}
-            </div>
-            <div className={styles.userUid}>{player.uid}</div>
+        <div className={styles.userNameBlock}>
+          <div className={styles.userDisplayName}>
+            <span className={styles.nameText}>{player.name}</span>
+            {isMe && <span className={styles.youTag}>YOU</span>}
           </div>
+          <div className={styles.userUid}>{player.uid}</div>
         </div>
       </td>
       <td style={{ textAlign: 'center' }}>
@@ -99,17 +94,32 @@ function TableRow({ player, isMe }: { player: LeaderboardEntry; isMe: boolean })
 export function LeaderboardView() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [sortBy, setSortBy] = useState<Sort>('points');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+
+  // wait for a short pause in typing before asking the server
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await apiFetch<Partial<LeaderboardResponse>>(`/api/leaderboard?sort=${sortBy}`);
+      const q = debounced ? `&q=${encodeURIComponent(debounced)}` : '';
+      const res = await apiFetch<Partial<LeaderboardResponse>>(`/api/leaderboard?sort=${sortBy}${q}`);
       if (cancelled) return;
       if (res.ok) {
-        setData({ entries: res.data.entries ?? [], me: res.data.me ?? null, meId: res.data.meId ?? null, total: res.data.total ?? 0 });
+        setData({
+          entries: res.data.entries ?? [],
+          me: res.data.me ?? null,
+          meId: res.data.meId ?? null,
+          total: res.data.total ?? 0,
+          query: res.data.query,
+        });
         setLoadError('');
       } else {
         setLoadError(res.data.error ?? 'Could not load the leaderboard.');
@@ -119,9 +129,10 @@ export function LeaderboardView() {
     return () => {
       cancelled = true;
     };
-  }, [sortBy]);
+  }, [sortBy, debounced]);
 
   const entries = data?.entries ?? [];
+  const searching = Boolean(data?.query);
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   const podium: { user: LeaderboardEntry; rank: 1 | 2 | 3 }[] = [];
   if (byRank(2)) podium.push({ user: byRank(2)!, rank: 2 });
@@ -130,8 +141,8 @@ export function LeaderboardView() {
 
   return (
     <div className={styles.wrapper}>
-      {/* Podium: shown when sorting by points */}
-      {sortBy === 'points' && podium.length > 0 && (
+      {/* Podium: shown for the top 10 view, sorted by points */}
+      {!searching && sortBy === 'points' && podium.length > 0 && (
         <section className={styles.podiumSection}>
           <h3 className={styles.podiumTitle}>Top Quizzers</h3>
           <div className={styles.podiumContainer}>
@@ -143,9 +154,23 @@ export function LeaderboardView() {
       )}
 
       <div className={styles.controlsBar}>
-        <div className={styles.countLabel}>
-          Top 10 of {data?.total ?? 0} {data?.total === 1 ? 'member' : 'members'}
+        <div className={styles.searchBox}>
+          <Search className={styles.searchIcon} size={18} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search any member by name or UID..."
+            className={styles.searchInput}
+            aria-label="Search members"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className={styles.clearSearch} aria-label="Clear search">
+              <X size={16} />
+            </button>
+          )}
         </div>
+
         <div className={styles.sortOptions}>
           <span className={styles.sortLabel}>Sort By:</span>
           <div className={styles.sortButtonGroup}>
@@ -159,6 +184,12 @@ export function LeaderboardView() {
         </div>
       </div>
 
+      <div className={styles.resultNote}>
+        {searching
+          ? `${entries.length} ${entries.length === 1 ? 'result' : 'results'} for "${data?.query}" — ranks are overall`
+          : `Top 10 of ${data?.total ?? 0} ${data?.total === 1 ? 'member' : 'members'}`}
+      </div>
+
       <div className={styles.tableCard}>
         {loading && !data ? (
           <div className={styles.noResults}>Loading leaderboard…</div>
@@ -167,10 +198,10 @@ export function LeaderboardView() {
         ) : entries.length === 0 ? (
           <div className={styles.noResults}>
             <Search size={28} style={{ margin: '0 auto 0.5rem' }} />
-            No participants on the leaderboard yet.
+            {searching ? `No members match "${data?.query}".` : 'No participants on the leaderboard yet.'}
           </div>
         ) : (
-          <div className={styles.tableResponsive}>
+          <div className={styles.tableResponsive} style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.1s' }}>
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -185,7 +216,7 @@ export function LeaderboardView() {
                 {entries.map((p) => (
                   <TableRow key={p.id} player={p} isMe={p.id === data?.meId} />
                 ))}
-                {data?.me && (
+                {!searching && data?.me && (
                   <>
                     <tr className={styles.gapRow}><td colSpan={5}>• • •</td></tr>
                     <TableRow player={data.me} isMe />
