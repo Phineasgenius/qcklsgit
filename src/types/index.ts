@@ -141,6 +141,10 @@ export interface Submission {
   edition: number | null;
   guess: string;
   isCorrect: boolean;
+  forfeited: boolean;
+  overridden: boolean;
+  attemptNo: number;
+  hintsUsed: HintTier[];
   pointsAwarded: number;
   timestamp: string;
 }
