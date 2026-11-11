@@ -14,8 +14,18 @@ import {
   Users as UsersIcon,
   Search,
   Check,
-  Lightbulb
+  Lightbulb,
+  CalendarDays
 } from 'lucide-react';
+
+/** Today's date in IST as YYYY-MM-DD. */
+function todayIST() {
+  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+function fmtDate(d: string) {
+  return new Date(`${d}T00:00:00`).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 const HINT_CHIP: Record<HintTier, { label: string; cls: string }> = {
   difficult: { label: 'Hint 1', cls: 'bg-[var(--coral)]' },
@@ -42,6 +52,7 @@ export function QuizmasterDashboard({
   const [activeTab, setActiveTab] = useState<'manage' | 'new' | 'users' | 'submissions'>('manage');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [scheduledDate, setScheduledDate] = useState('');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -109,6 +120,7 @@ export function QuizmasterDashboard({
         hintEasy: hintCount === 3 ? hintEasy : '',
         answer,
         funda,
+        scheduledDate,
       },
     });
     setSaving(false);
@@ -122,6 +134,7 @@ export function QuizmasterDashboard({
     setHintEasy('');
     setAnswer('');
     setFunda('');
+    setScheduledDate('');
     setFormMsg('');
     await loadAll();
     setActiveTab('manage');
@@ -324,6 +337,12 @@ export function QuizmasterDashboard({
                             ● ACTIVE QUESTION OF THE DAY
                           </span>
                         )}
+                        {q.scheduledDate && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--lilac)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] inline-flex items-center gap-1">
+                            <CalendarDays className="w-3 h-3" />
+                            {isActive || q.status === 'archived' ? 'Date' : 'Goes live'}: {fmtDate(q.scheduledDate)}
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-extrabold text-base text-[var(--ink)]">
                         {q.title}
@@ -496,6 +515,22 @@ export function QuizmasterDashboard({
                   className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
+                Goes live on (optional)
+              </label>
+              <input
+                type="date"
+                min={todayIST()}
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                className="w-full md:w-1/2 px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
+              />
+              <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                Becomes the Question of the Day on this date (IST), when the first visitor loads the site. Leave empty to rotate in edition order or activate manually.
+              </p>
             </div>
 
             <div className="pt-2 flex justify-end">

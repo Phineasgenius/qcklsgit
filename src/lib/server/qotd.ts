@@ -15,6 +15,7 @@ export interface QuestionRow {
   funda_keywords: string[] | null;
   status: 'draft' | 'active' | 'archived';
   published_at: string | null;
+  scheduled_date?: string | null;
   created_at: string;
 }
 
@@ -48,9 +49,27 @@ export function pointsFor(tiers: string[]): number {
   return 100;
 }
 
-export async function getActiveQuestion(): Promise<QuestionRow | null> {
+async function fetchActive(): Promise<QuestionRow | null> {
   const { data } = await db().from('questions').select('*').eq('status', 'active').maybeSingle();
   return (data as QuestionRow | null) ?? null;
+}
+
+/**
+ * The active question. If it was published on an earlier IST day, the next
+ * draft edition is activated first (the database does this atomically), so the
+ * first visitor after midnight IST triggers the switch.
+ */
+export async function getActiveQuestion(): Promise<QuestionRow | null> {
+  const q = await fetchActive();
+  if (!q || !q.published_at || istDate(q.published_at) >= istDate(null)) return q;
+
+  const { data, error } = await db().rpc('rotate_qotd');
+  if (error) {
+    // Never break the page because rotation failed; keep serving the current question.
+    console.error('[rotate_qotd]', error);
+    return q;
+  }
+  return data ? await fetchActive() : q;
 }
 
 function istDate(iso: string | null): string {

@@ -39,6 +39,7 @@ export interface QMQuestion {
   answer: string;
   funda?: string;
   status: 'draft' | 'active' | 'archived';
+  scheduledDate?: string;
   createdAt: string;
 }
 
