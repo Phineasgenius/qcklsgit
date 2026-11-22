@@ -15,7 +15,8 @@ import {
   Search,
   Check,
   Lightbulb,
-  CalendarDays
+  CalendarDays,
+  Pencil
 } from 'lucide-react';
 
 /** Today's date in IST as YYYY-MM-DD. */
@@ -26,6 +27,17 @@ function todayIST() {
 function fmtDate(d: string) {
   return new Date(`${d}T00:00:00`).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
 }
+
+const DEFAULT_LABELS = ['X', 'Y', 'Z', 'W', 'V'];
+
+interface PartForm {
+  label: string;
+  answer: string;
+  /** one alternative answer per line */
+  alternatives: string;
+}
+
+const emptyParts = (): PartForm[] => Array.from({ length: 5 }, () => ({ label: '', answer: '', alternatives: '' }));
 
 const HINT_CHIP: Record<HintTier, { label: string; cls: string }> = {
   difficult: { label: 'Hint 1', cls: 'bg-[var(--coral)]' },
@@ -61,8 +73,10 @@ export function QuizmasterDashboard({
   const [hintDifficult, setHintDifficult] = useState('');
   const [hintMedium, setHintMedium] = useState('');
   const [hintEasy, setHintEasy] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [funda, setFunda] = useState('');
+  const [partCount, setPartCount] = useState(1);
+  const [parts, setParts] = useState<PartForm[]>(emptyParts);
+  const [explanation, setExplanation] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formMsg, setFormMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -98,7 +112,45 @@ export function QuizmasterDashboard({
 
   if (!isOpen) return null;
 
-  const handleCreateQuestion = async (e: React.FormEvent) => {
+  const updatePart = (i: number, patch: Partial<PartForm>) =>
+    setParts((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+
+  const resetForm = () => {
+    setTitle('');
+    setQuestionText('');
+    setHintCount(3);
+    setHintDifficult('');
+    setHintMedium('');
+    setHintEasy('');
+    setPartCount(1);
+    setParts(emptyParts());
+    setExplanation('');
+    setScheduledDate('');
+    setEditingId(null);
+    setFormMsg('');
+  };
+
+  const startEdit = (q: QMQuestion) => {
+    const next = emptyParts();
+    q.parts.slice(0, 5).forEach((p, i) => {
+      next[i] = { label: p.label, answer: p.answer, alternatives: p.alternatives.join('\n') };
+    });
+    setEditingId(q.id);
+    setTitle(q.title);
+    setQuestionText(q.questionText);
+    setHintCount(q.hints.easy ? 3 : q.hints.medium ? 2 : 1);
+    setHintDifficult(q.hints.difficult ?? '');
+    setHintMedium(q.hints.medium ?? '');
+    setHintEasy(q.hints.easy ?? '');
+    setParts(next);
+    setPartCount(Math.max(1, Math.min(5, q.parts.length)));
+    setExplanation(q.explanation ?? '');
+    setScheduledDate(q.scheduledDate ?? '');
+    setFormMsg('');
+    setActiveTab('new');
+  };
+
+  const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormMsg('');
 
@@ -107,19 +159,29 @@ export function QuizmasterDashboard({
     if (!hintDifficult.trim()) return setFormMsg('Hint 1 is empty. Please provide at least the first clue.');
     if (hintCount >= 2 && !hintMedium.trim()) return setFormMsg('Hint 2 is empty. Please provide the medium clue.');
     if (hintCount === 3 && !hintEasy.trim()) return setFormMsg('Hint 3 is empty. Please provide the easiest clue.');
-    if (!answer.trim()) return setFormMsg('Canonical answer is empty. Please provide the answer.');
+
+    const active = parts.slice(0, partCount);
+    for (let i = 0; i < active.length; i++) {
+      if (!active[i].answer.trim()) {
+        return setFormMsg(partCount === 1 ? 'Canonical answer is empty. Please provide the answer.' : `Answer ${i + 1} is empty. Please give a canonical answer for every part.`);
+      }
+    }
 
     setSaving(true);
-    const res = await apiFetch('/api/qm/questions', {
-      method: 'POST',
+    const res = await apiFetch(editingId ? `/api/qm/questions/${editingId}` : '/api/qm/questions', {
+      method: editingId ? 'PUT' : 'POST',
       body: {
         title,
         questionText,
         hintDifficult,
         hintMedium: hintCount >= 2 ? hintMedium : '',
         hintEasy: hintCount === 3 ? hintEasy : '',
-        answer,
-        funda,
+        parts: active.map((p, i) => ({
+          label: partCount > 1 ? p.label.trim() || DEFAULT_LABELS[i] : '',
+          answer: p.answer,
+          alternatives: p.alternatives.split('\n').map((x) => x.trim()).filter(Boolean),
+        })),
+        explanation,
         scheduledDate,
       },
     });
@@ -127,15 +189,7 @@ export function QuizmasterDashboard({
 
     if (!res.ok) return setFormMsg(res.data.error ?? 'Could not save the question.');
 
-    setTitle('');
-    setQuestionText('');
-    setHintDifficult('');
-    setHintMedium('');
-    setHintEasy('');
-    setAnswer('');
-    setFunda('');
-    setScheduledDate('');
-    setFormMsg('');
+    resetForm();
     await loadAll();
     setActiveTab('manage');
   };
@@ -192,7 +246,7 @@ export function QuizmasterDashboard({
     parts.map((p) => String(p ?? '')).join(' ').toLowerCase().includes(term);
 
   const fq = term
-    ? questions.filter((q) => has(q.title, q.questionText, q.answer, q.funda, q.status, q.edition, `#${q.edition}`, `ed ${q.edition}`))
+    ? questions.filter((q) => has(q.title, q.questionText, q.answer, q.explanation, q.status, q.edition, `#${q.edition}`, `ed ${q.edition}`))
     : questions;
   const fu = term
     ? users.filter((u) => has(u.name, u.uid, u.branch, u.year, u.designation, `${u.year} year`))
@@ -351,8 +405,11 @@ export function QuizmasterDashboard({
                         {q.questionText}
                       </p>
                       <div className="text-[11px] font-mono text-[var(--text-muted)] font-semibold">
-                        Answer: <strong>{q.answer}</strong>
-                        {q.funda && <span> • Expected Funda: <em>{q.funda}</em></span>}
+                        {q.parts.length > 1 ? 'Answers' : 'Answer'}:{' '}
+                        <strong>{q.parts.map((p) => `${p.label ? `${p.label}: ` : ''}${p.answer}`).join(' • ')}</strong>
+                        {q.parts.some((p) => p.alternatives.length > 0) && (
+                          <span> • {q.parts.reduce((n, p) => n + p.alternatives.length, 0)} alt.</span>
+                        )}
                       </div>
                     </div>
 
@@ -372,6 +429,14 @@ export function QuizmasterDashboard({
                       )}
 
                       <button
+                        onClick={() => startEdit(q)}
+                        className="p-1.5 rounded-lg border-[1.5px] border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--paper-deep)]"
+                        title="Edit Question"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => handleDeleteQuestion(q.id)}
                         className="p-1.5 rounded-lg border-[1.5px] border-[var(--ink)] text-[var(--red)] hover:bg-[var(--paper-deep)]"
                         title="Delete Question"
@@ -388,10 +453,16 @@ export function QuizmasterDashboard({
 
         {/* Tab 2: Add Question Form (NO PLACEHOLDERS) */}
         {activeTab === 'new' && (
-          <form onSubmit={handleCreateQuestion} className="overflow-y-auto p-5 flex-1 space-y-4">
+          <form onSubmit={handleSaveQuestion} className="overflow-y-auto p-5 flex-1 space-y-4">
             {formMsg && (
               <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--teal)]/20 text-xs font-bold text-[var(--ink)]">
                 {formMsg}
+              </div>
+            )}
+
+            {editingId && (
+              <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--lilac)]/30 text-xs font-bold text-[var(--ink)]">
+                Editing an existing question. Changes apply immediately, including if it is live right now.
               </div>
             )}
 
@@ -489,32 +560,89 @@ export function QuizmasterDashboard({
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
+            {/* Answers: one box per part, each with its own alternatives */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
-                  Canonical Answer
+                  Number of answers (1 - 5)
                 </label>
-                <input
-                  type="text"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="e.g. Muhurat Trading"
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
-                />
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      type="button"
+                      key={n}
+                      onClick={() => setPartCount(n)}
+                      className={`w-9 py-1.5 rounded-xl border-[2px] border-[var(--ink)] text-xs font-black transition-all ${
+                        partCount === n ? 'bg-[var(--yellow)] text-[#1b1712] shadow-[2px_2px_0_var(--ink)]' : 'bg-[var(--paper)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
-                  Expected Funda / Concept (also accepted if given)
-                </label>
-                <input
-                  type="text"
-                  value={funda}
-                  onChange={(e) => setFunda(e.target.value)}
-                  placeholder="e.g. Muhurat (also accepted)"
-                  className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
-                />
-              </div>
+              {parts.slice(0, partCount).map((p, i) => (
+                <div key={i} className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] space-y-2.5">
+                  <div className={partCount > 1 ? 'grid grid-cols-1 md:grid-cols-[110px_1fr] gap-3' : ''}>
+                    {partCount > 1 && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase text-[var(--text-secondary)]">Label</label>
+                        <input
+                          type="text"
+                          value={p.label}
+                          onChange={(e) => updatePart(i, { label: e.target.value })}
+                          placeholder={DEFAULT_LABELS[i]}
+                          maxLength={20}
+                          className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-black placeholder:text-[var(--text-muted)] placeholder:font-normal"
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
+                        {partCount > 1 ? `Canonical answer for ${p.label.trim() || DEFAULT_LABELS[i]}` : 'Canonical Answer'}
+                      </label>
+                      <input
+                        type="text"
+                        value={p.answer}
+                        onChange={(e) => updatePart(i, { answer: e.target.value })}
+                        placeholder="e.g. Muhurat Trading"
+                        className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold placeholder:text-[var(--text-muted)] placeholder:font-normal"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
+                      Alternative answers (optional, one per line)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={p.alternatives}
+                      onChange={(e) => updatePart(i, { alternatives: e.target.value })}
+                      placeholder={'Other spellings or names that should also be accepted'}
+                      className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                Each answer is checked only against its own canonical answer and alternatives. Small typos are forgiven only in longer words (6+ letters); short words, numbers and years must match exactly.
+                {partCount > 1 && ' Points are split evenly between the answers.'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
+                Explanation (shown to members after they finish; not used for checking)
+              </label>
+              <textarea
+                rows={3}
+                value={explanation}
+                onChange={(e) => setExplanation(e.target.value)}
+                placeholder="Why this is the answer, the connect, interesting background…"
+                className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
+              />
             </div>
 
             <div className="space-y-1">
@@ -523,7 +651,7 @@ export function QuizmasterDashboard({
               </label>
               <input
                 type="date"
-                min={todayIST()}
+                min={editingId ? undefined : todayIST()}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 className="w-full md:w-1/2 px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-bold"
@@ -533,9 +661,14 @@ export function QuizmasterDashboard({
               </p>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex justify-end gap-2.5">
+              {editingId && (
+                <button type="button" onClick={resetForm} className="btn-neo btn-neo-secondary text-xs">
+                  Cancel Edit
+                </button>
+              )}
               <button type="submit" disabled={saving} className="btn-neo btn-neo-primary text-xs">
-                {saving ? 'Saving…' : 'Save to Question Dump'}
+                {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Save to Question Dump'}
               </button>
             </div>
           </form>
@@ -639,7 +772,7 @@ export function QuizmasterDashboard({
                           </span>
                         ) : (
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--red)] text-white border border-[var(--ink)]">
-                            WRONG
+                            {sub.pointsAwarded > 0 ? `PARTIAL (+${sub.pointsAwarded}★)` : 'WRONG'}
                           </span>
                         )}
                         {sub.overridden && (

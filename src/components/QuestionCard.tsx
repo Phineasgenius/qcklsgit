@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { HintTier, QotdState } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
+import { splitPoints } from '@/lib/points';
 import confetti from 'canvas-confetti';
 import {
   Send,
@@ -34,7 +35,7 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
   const question = qotd.question!;
   const { attempts, maxAttempts, result, solution, unlockedHints } = qotd;
 
-  const [guess, setGuess] = useState('');
+  const [guesses, setGuesses] = useState<string[]>(() => question.parts.map(() => ''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirmUnlockTier, setConfirmUnlockTier] = useState<HintTier | null>(null);
@@ -48,6 +49,13 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
     : unlockedTiers.includes('difficult')
     ? 90
     : 100;
+
+  // Multi-answer questions: each answer is worth an equal share of the points.
+  const solvedSet = new Set(qotd.solvedParts ?? []);
+  const multi = question.parts.length > 1;
+  const todo = question.parts.map((p, i) => ({ ...p, i })).filter((p) => !solvedSet.has(p.i));
+  const shares = splitPoints(potentialPoints, question.parts.length);
+  const availablePoints = todo.reduce((sum, p) => sum + shares[p.i], 0);
 
   const finished = result !== null;
   const attemptsLeft = Math.max(0, maxAttempts - attempts.length);
@@ -70,19 +78,20 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
 
   const handleUnlockHint = async (tier: HintTier) => {
     setConfirmUnlockTier(null);
-    await post('/api/qotd/hint', { tier });
+    await post('/api/qotd/hint', { tier, questionId: question.id });
   };
 
   const handleGuessSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (busy || finished) return;
-    if (!guess.trim()) {
-      setError('Answer is empty. Please enter your answer or expected funda.');
+    const answers = question.parts.map((_, i) => (solvedSet.has(i) ? '' : guesses[i] ?? ''));
+    if (!answers.some((a) => a.trim())) {
+      setError(multi ? 'Please answer at least one part.' : 'Answer is empty. Please enter your answer.');
       return;
     }
-    const state = await post('/api/qotd/submit', { guess });
+    const state = await post('/api/qotd/submit', { questionId: question.id, guesses: answers });
     if (!state) return;
-    setGuess('');
+    setGuesses(question.parts.map(() => ''));
     await refreshUser();
     if (state.result?.status === 'solved') {
       try {
@@ -95,16 +104,34 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
 
   const handleConfirmForfeit = async () => {
     setShowForfeitModal(false);
-    const state = await post('/api/qotd/forfeit');
+    const state = await post('/api/qotd/forfeit', { questionId: question.id });
     if (state) await refreshUser();
   };
 
   const hints = question.availableHints.map((tier) => ({ tier, ...HINT_META[tier], text: unlockedHints[tier] }));
 
+  const solutionList = solution && (
+    <div className="space-y-1">
+      {solution.answers.map((a, i) => (
+        <div key={i}>
+          {a.label && <span className="font-black">{a.label}: </span>}
+          {a.answer}
+        </div>
+      ))}
+    </div>
+  );
+
+  const explanationBlock = solution?.explanation && (
+    <div className="mt-2 pt-2 border-t-[1.5px] border-[var(--ink)] text-xs font-medium text-[var(--text-secondary)] leading-relaxed">
+      <span className="font-black text-[var(--ink)]">Explanation: </span>
+      {solution.explanation}
+    </div>
+  );
+
   const solutionBox = solution && (
     <div className="p-3 rounded-lg border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] font-bold text-sm text-[var(--ink)]">
-      {solution.answer}
-      {solution.funda && <div className="mt-1 text-xs text-[var(--text-secondary)] font-medium">Accepted Funda: {solution.funda}</div>}
+      {solutionList}
+      {explanationBlock}
     </div>
   );
 
@@ -122,7 +149,7 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-[var(--text-secondary)]">{finished ? 'Your Reward:' : 'Available Reward:'}</span>
           <span className="font-mono font-black text-sm px-3 py-0.5 rounded-full bg-[var(--bg-secondary)] border-[2px] border-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
-            {finished ? result!.pointsAwarded : potentialPoints} ★
+            {finished ? result!.pointsAwarded : availablePoints} ★
           </span>
         </div>
       </div>
@@ -135,8 +162,12 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
         </div>
         <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold leading-snug tracking-tight text-[var(--ink)]">{question.questionText}</h2>
         <p className="text-xs font-semibold text-[var(--text-secondary)]">
-          Answering the exact name or the underlying expected funda/concept is accepted as correct! You get{' '}
-          <strong>{maxAttempts} {maxAttempts === 1 ? 'attempt' : 'attempts'}</strong> ({question.availableHints.length} {question.availableHints.length === 1 ? 'clue' : 'clues'} + 1).
+          {multi && (
+            <>
+              This question has <strong>{question.parts.length} answers</strong> ({question.parts.map((p) => p.label).join(', ')}). Each one is worth an equal share of the points.{' '}
+            </>
+          )}
+          You get <strong>{maxAttempts} {maxAttempts === 1 ? 'attempt' : 'attempts'}</strong> ({question.availableHints.length} {question.availableHints.length === 1 ? 'clue' : 'clues'} + 1).
         </p>
       </div>
 
@@ -202,22 +233,48 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
         {!finished && (
           <form onSubmit={handleGuessSubmit} className="space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <label className="text-xs font-black uppercase tracking-wider text-[var(--text-secondary)]">Your Answer or Funda</label>
+              <label className="text-xs font-black uppercase tracking-wider text-[var(--text-secondary)]">{multi ? 'Your Answers' : 'Your Answer'}</label>
               <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded-full border-[1.5px] border-[var(--ink)] bg-[var(--paper-deep)] text-[var(--ink)]">
                 Attempt {attempts.length + 1} of {maxAttempts} • {attemptsLeft} left
               </span>
             </div>
-            <input
-              type="text"
-              value={guess}
-              onChange={(e) => {
-                setGuess(e.target.value);
-                if (error) setError('');
-              }}
-              placeholder="Type your answer or funda..."
-              maxLength={300}
-              className="w-full px-4 py-3.5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--bg-secondary)] text-[var(--ink)] text-sm font-semibold shadow-[4px_4px_0_var(--ink)] focus:outline-none focus:translate-x-[-1px] focus:translate-y-[-1px] focus:shadow-[6px_6px_0_var(--ink)] transition-all placeholder:text-[var(--text-muted)] placeholder:font-normal"
-            />
+            {multi && solvedSet.size > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {question.parts.map((p, i) =>
+                  solvedSet.has(i) ? (
+                    <span key={i} className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full border-[1.5px] border-[var(--ink)] bg-[var(--teal)] text-[#1b1712]">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {p.label} solved
+                    </span>
+                  ) : null
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {todo.map((p) => (
+                <div key={p.i} className="space-y-1.5">
+                  {multi && (
+                    <label className="text-[11px] font-black uppercase tracking-wider text-[var(--text-secondary)]">
+                      Answer {p.label}
+                      <span className="ml-1.5 font-mono text-[var(--text-muted)]">({shares[p.i]} ★)</span>
+                    </label>
+                  )}
+                  <input
+                    type="text"
+                    value={guesses[p.i] ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setGuesses((prev) => prev.map((g, idx) => (idx === p.i ? v : g)));
+                      if (error) setError('');
+                    }}
+                    placeholder={multi ? `Your answer for ${p.label}...` : 'Type your answer...'}
+                    maxLength={300}
+                    className="w-full px-4 py-3.5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--bg-secondary)] text-[var(--ink)] text-sm font-semibold shadow-[4px_4px_0_var(--ink)] focus:outline-none focus:translate-x-[-1px] focus:translate-y-[-1px] focus:shadow-[6px_6px_0_var(--ink)] transition-all placeholder:text-[var(--text-muted)] placeholder:font-normal"
+                  />
+                </div>
+              ))}
+            </div>
 
             {error && (
               <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/20 text-xs font-bold text-[var(--ink)] flex items-center gap-2">
@@ -230,7 +287,7 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
               <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/15 text-xs font-bold text-[var(--ink)] flex items-center gap-2.5 shadow-[3px_3px_0_var(--ink)] animate-shake">
                 <XCircle className="w-5 h-5 text-[var(--red)] shrink-0" />
                 <span>
-                  &quot;{lastWrong.guess}&quot; was not right. {lastWrong.feedback} {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
+                  {multi ? 'Not there yet.' : <>&quot;{lastWrong.guess}&quot; was not right.</>} {lastWrong.feedback} {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
                 </span>
               </div>
             )}
@@ -247,7 +304,7 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
               </button>
               <button type="submit" disabled={busy} className="btn-neo btn-neo-primary text-xs !py-3 !px-6">
                 <Send className="w-4 h-4" />
-                <span>{busy ? 'Checking…' : `Submit Answer (${potentialPoints} ★)`}</span>
+                <span>{busy ? 'Checking…' : `Submit ${multi ? 'Answers' : 'Answer'} (${availablePoints} ★)`}</span>
               </button>
             </div>
           </form>
@@ -275,9 +332,10 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
               </span>
             </div>
             {solution && (
-              <div className="pt-2 border-t-[2px] border-[var(--ink)] text-xs font-bold text-[var(--ink)]">
-                Official Solution: <span className="font-normal">{solution.answer}</span>
-                {solution.funda && <div className="mt-1 text-[var(--text-secondary)] font-medium">Accepted Funda: {solution.funda}</div>}
+              <div className="pt-2 border-t-[2px] border-[var(--ink)] text-xs font-bold text-[var(--ink)] space-y-1">
+                <div>Correct {solution.answers.length > 1 ? 'answers' : 'answer'}:</div>
+                <div className="font-normal text-sm">{solutionList}</div>
+                {explanationBlock}
               </div>
             )}
             <div className="flex justify-end pt-1">
@@ -294,9 +352,9 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
           <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[6px_6px_0_var(--ink)] space-y-2 animate-fadeIn">
             <div className="flex items-center gap-2">
               <XCircle className="w-6 h-6 text-[var(--red)] stroke-[2.5]" />
-              <h4 className="text-lg font-black text-[var(--ink)]">Out of attempts (0 Points)</h4>
+              <h4 className="text-lg font-black text-[var(--ink)]">Out of attempts ({result.pointsAwarded} Points)</h4>
             </div>
-            <p className="text-xs font-medium text-[var(--text-secondary)]">You used all {maxAttempts} attempts. The answer was:</p>
+            <p className="text-xs font-medium text-[var(--text-secondary)]">You used all {maxAttempts} attempts. The correct {multi ? 'answers were' : 'answer was'}:</p>
             {solutionBox}
           </div>
         )}
@@ -306,9 +364,9 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
           <div className="p-5 rounded-xl border-[2.5px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[6px_6px_0_var(--ink)] space-y-2">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-6 h-6 text-[var(--red)] stroke-[2.5]" />
-              <h4 className="text-lg font-black text-[var(--ink)]">Puzzle Forfeited (0 Points)</h4>
+              <h4 className="text-lg font-black text-[var(--ink)]">Puzzle Forfeited ({result.pointsAwarded} Points)</h4>
             </div>
-            <p className="text-xs font-medium text-[var(--text-secondary)]">The official solution is:</p>
+            <p className="text-xs font-medium text-[var(--text-secondary)]">The official {multi ? 'answers are' : 'answer is'}:</p>
             {solutionBox}
           </div>
         )}
@@ -342,11 +400,11 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
               <h3 className="text-lg font-extrabold text-[var(--ink)]">Forfeit Puzzle?</h3>
             </div>
             <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
-              Revealing the solution ends Edition #{question.edition} for you with 0 points, even if you have attempts left.
+              Revealing the solution ends Edition #{question.edition} for you, even if you have attempts left. {solvedSet.size > 0 ? 'You keep the points already earned from the parts you solved.' : 'You will get 0 points.'}
             </p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button onClick={() => setShowForfeitModal(false)} className="btn-neo btn-neo-secondary text-xs">Keep Trying</button>
-              <button onClick={handleConfirmForfeit} className="btn-neo btn-neo-primary text-xs">Reveal Answer (0 pts)</button>
+              <button onClick={handleConfirmForfeit} className="btn-neo btn-neo-primary text-xs">Reveal Answer</button>
             </div>
           </div>
         </div>

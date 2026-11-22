@@ -61,7 +61,7 @@ export const GET = handle(async () => {
       status: solved ? 'solved' : forfeited ? 'forfeited' : rows.length >= max ? 'failed' : 'in_progress',
       attempts: rows.length,
       maxAttempts: max,
-      points: solved ? solved.points_awarded : 0,
+      points: rows.reduce((sum, r) => sum + r.points_awarded, 0),
       hintsUsed: Math.max(0, ...rows.map((r) => (r.hints_unlocked ?? []).length)),
     });
   }

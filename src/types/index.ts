@@ -12,15 +12,16 @@ export interface User {
   branch?: string | null;
   designation?: string | null;
   securityQuestion?: string | null;
-  uidChangeableAt?: string | null;
   /** true when a student still has to give year / branch / designation / security question */
   needsProfile?: boolean;
+  /** When the member may change their UID next (null = can change now). */
+  uidChangeableAt?: string | null;
   createdAt: string;
 }
 
 export type HintTier = 'difficult' | 'medium' | 'easy';
 
-/** What every visitor may see about the active question (never the answer or hint text). */
+/** What every visitor may see about the active question (never the answers or hint text). */
 export interface Question {
   id: string;
   edition: number;
@@ -28,6 +29,15 @@ export interface Question {
   questionText: string;
   date: string;
   availableHints: HintTier[];
+  /** One entry per answer the question asks for (label is empty for a single-answer question). */
+  parts: { label: string }[];
+}
+
+/** One answer of a question, as seen by the quizmaster. */
+export interface QMPart {
+  label: string;
+  answer: string;
+  alternatives: string[];
 }
 
 /** Full question as seen by the quizmaster. */
@@ -37,8 +47,11 @@ export interface QMQuestion {
   title: string;
   questionText: string;
   hints: { difficult?: string; medium?: string; easy?: string };
+  /** all canonical answers joined with " / " (for search and display) */
   answer: string;
-  funda?: string;
+  parts: QMPart[];
+  /** shown to members after they finish; never used for checking */
+  explanation?: string;
   status: 'draft' | 'active' | 'archived';
   scheduledDate?: string;
   createdAt: string;
@@ -70,9 +83,11 @@ export interface QotdState {
   maxAttempts: number;
   attempts: QotdAttempt[];
   unlockedHints: Partial<Record<HintTier, string>>;
+  /** 0-based indexes of the answer parts this member has already solved */
+  solvedParts: number[];
   /** set once the user has finished (solved, ran out of attempts, or forfeited) */
   result: QotdResult | null;
-  solution: { answer: string; funda?: string } | null;
+  solution: { answers: { label: string; answer: string }[]; explanation?: string } | null;
   streak: StreakInfo | null;
 }
 

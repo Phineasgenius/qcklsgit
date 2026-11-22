@@ -1,6 +1,13 @@
 import { db } from './db';
 import { streaksFor } from './board';
+import { splitPoints } from '@/lib/points';
 import type { HintTier, QotdState, QotdAttempt } from '@/types';
+
+export interface PartRow {
+  label: string;
+  answer: string;
+  alternatives: string[];
+}
 
 export interface QuestionRow {
   id: string;
@@ -13,10 +20,20 @@ export interface QuestionRow {
   answer: string;
   funda: string | null;
   funda_keywords: string[] | null;
+  parts: PartRow[] | null;
+  explanation: string | null;
   status: 'draft' | 'active' | 'archived';
   published_at: string | null;
   scheduled_date?: string | null;
   created_at: string;
+}
+
+export interface PartResult {
+  idx: number;
+  label: string;
+  guess: string;
+  correct: boolean;
+  points: number;
 }
 
 interface AttemptRow {
@@ -27,6 +44,7 @@ interface AttemptRow {
   points_awarded: number;
   match_feedback: string | null;
   hints_unlocked: HintTier[] | null;
+  part_results: PartResult[] | null;
 }
 
 export const TIERS: HintTier[] = ['difficult', 'medium', 'easy'];
@@ -34,6 +52,18 @@ export const TIERS: HintTier[] = ['difficult', 'medium', 'easy'];
 export function hintText(q: QuestionRow, tier: HintTier): string | null {
   const v = tier === 'difficult' ? q.hint_difficult : tier === 'medium' ? q.hint_medium : q.hint_easy;
   return v && v.trim() ? v : null;
+}
+
+/** The answer parts of a question (old single-answer rows count as one part). */
+export function partsOf(q: QuestionRow): PartRow[] {
+  if (Array.isArray(q.parts) && q.parts.length > 0) {
+    return q.parts.map((p) => ({
+      label: p.label ?? '',
+      answer: p.answer,
+      alternatives: Array.isArray(p.alternatives) ? p.alternatives : [],
+    }));
+  }
+  return [{ label: '', answer: q.answer, alternatives: q.funda_keywords ?? [] }];
 }
 
 /** One attempt for each clue, plus one. */
@@ -49,6 +79,29 @@ export function pointsFor(tiers: string[]): number {
   return 100;
 }
 
+/** Points each part is worth at the current hint level. */
+export function pointsPerPart(tiers: string[], parts: number): number[] {
+  return splitPoints(pointsFor(tiers), parts);
+}
+
+/** Which parts (0-based) a member has solved so far; everything if they finished the question. */
+function solvedIndexes(rows: { is_correct: boolean; part_results: PartResult[] | null }[], n: number): number[] {
+  if (rows.some((r) => r.is_correct)) return Array.from({ length: n }, (_, i) => i);
+  const set = new Set<number>();
+  for (const r of rows) for (const p of r.part_results ?? []) if (p.correct) set.add(p.idx);
+  return [...set].filter((i) => i >= 0 && i < n).sort((a, b) => a - b);
+}
+
+export async function solvedPartsFor(userId: string, questionId: string, n: number): Promise<number[]> {
+  const { data, error } = await db()
+    .from('submissions')
+    .select('is_correct, part_results')
+    .eq('user_id', userId)
+    .eq('question_id', questionId);
+  if (error) throw error;
+  return solvedIndexes((data ?? []) as { is_correct: boolean; part_results: PartResult[] | null }[], n);
+}
+
 async function fetchActive(): Promise<QuestionRow | null> {
   const { data } = await db().from('questions').select('*').eq('status', 'active').maybeSingle();
   return (data as QuestionRow | null) ?? null;
@@ -56,7 +109,7 @@ async function fetchActive(): Promise<QuestionRow | null> {
 
 /**
  * The active question. If it was published on an earlier IST day, the next
- * draft edition is activated first (the database does this atomically), so the
+ * draft is activated first (the database does this atomically), so the
  * first visitor after midnight IST triggers the switch.
  */
 export async function getActiveQuestion(): Promise<QuestionRow | null> {
@@ -80,10 +133,11 @@ function istDate(iso: string | null): string {
 export async function buildState(userId: string | null): Promise<QotdState> {
   const q = await getActiveQuestion();
   const empty: QotdState = {
-    question: null, maxAttempts: 0, attempts: [], unlockedHints: {}, result: null, solution: null, streak: null,
+    question: null, maxAttempts: 0, attempts: [], unlockedHints: {}, solvedParts: [], result: null, solution: null, streak: null,
   };
   if (!q) return empty;
 
+  const parts = partsOf(q);
   const max = maxAttemptsFor(q);
   const state: QotdState = {
     ...empty,
@@ -94,6 +148,7 @@ export async function buildState(userId: string | null): Promise<QotdState> {
       questionText: q.question_text,
       date: istDate(q.published_at),
       availableHints: TIERS.filter((t) => hintText(q, t) !== null),
+      parts: parts.map((p) => ({ label: p.label })),
     },
     maxAttempts: max,
   };
@@ -119,6 +174,7 @@ export async function buildState(userId: string | null): Promise<QotdState> {
     forfeited: r.is_forfeit,
     feedback: r.match_feedback ?? '',
   }));
+  state.solvedParts = solvedIndexes(rows, parts.length);
 
   const solved = rows.find((r) => r.is_correct);
   const forfeit = rows.find((r) => r.is_forfeit);
@@ -128,11 +184,15 @@ export async function buildState(userId: string | null): Promise<QotdState> {
     const last = rows[rows.length - 1];
     state.result = {
       status: solved ? 'solved' : forfeit ? 'forfeited' : 'failed',
-      pointsAwarded: solved ? solved.points_awarded : 0,
+      // Everything earned across attempts, including partial credit.
+      pointsAwarded: rows.reduce((sum, r) => sum + r.points_awarded, 0),
       feedback: last?.match_feedback ?? '',
       hintsUnlocked: (solved?.hints_unlocked ?? (Object.keys(state.unlockedHints) as HintTier[])),
     };
-    state.solution = { answer: q.answer, funda: q.funda ?? undefined };
+    state.solution = {
+      answers: parts.map((p) => ({ label: p.label, answer: p.answer })),
+      explanation: (q.explanation ?? q.funda) || undefined,
+    };
   }
 
   return state;

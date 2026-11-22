@@ -15,6 +15,9 @@ export const POST = handle(async (req) => {
 
   const q = await getActiveQuestion();
   if (!q) return fail('There is no active question right now.', 404);
+  if (typeof b.questionId === 'string' && b.questionId && b.questionId !== q.id) {
+    return fail('A new question has just gone live. Please read it before continuing.', 409, { state: await buildState(me.id) });
+  }
   if (!hintText(q, tier)) return fail('This clue does not exist for the question.');
 
   const current = await buildState(me.id);
