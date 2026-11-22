@@ -14,7 +14,7 @@ import { ProfileCompleteModal } from '@/components/ProfileCompleteModal';
 import { apiFetch } from '@/lib/api';
 import { QotdState, HintTier } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { LogIn, UserPlus, Trophy, Flame, Instagram } from 'lucide-react';
+import { LogIn, UserPlus, Trophy, Flame, Instagram, Coins, Snowflake, X } from 'lucide-react';
 
 const INSTAGRAM_URL = 'https://www.instagram.com/qc_klsgit';
 const WHATSAPP_URL = 'https://chat.whatsapp.com/GHxDzKG4JArKg6YsuYZxwZ';
@@ -29,7 +29,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 export default function HomePage() {
-  const { isQM, currentUser, loading: authLoading } = useAuth();
+  const { isQM, currentUser, loading: authLoading, dailyNote, clearDailyNote } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'quiz' | 'leaderboard'>('quiz');
   const [qotd, setQotd] = useState<QotdState | null>(null);
@@ -108,9 +108,30 @@ export default function HomePage() {
                   {qotd.streak.current}-day streak
                 </span>
               )}
-              <span className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)]">
-                {currentUser.points} ★ Points
+              <span
+                className="px-2 py-0.5 rounded bg-[var(--yellow)] text-[#1b1712] border border-[var(--ink)]"
+                title="Total points earned so far. The leaderboard shows this week's points."
+              >
+                {currentUser.points} ★ Total
               </span>
+              {currentUser.role === 'user' && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--ink)] border border-[var(--ink)]"
+                  title="Coins: spend them on streak freezes (see your Profile)"
+                >
+                  <Coins className="w-3.5 h-3.5" />
+                  {currentUser.coins ?? 0}
+                </span>
+              )}
+              {currentUser.role === 'user' && (currentUser.streakFreezes ?? 0) > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--ink)] border border-[var(--ink)]"
+                  title="Streak freezes: used automatically if you miss a day"
+                >
+                  <Snowflake className="w-3.5 h-3.5" />
+                  {currentUser.streakFreezes}
+                </span>
+              )}
               {currentUser.role === 'user' && (
                 <Link href="/profile" className="underline text-[var(--text-secondary)] hover:text-[var(--ink)]">Profile</Link>
               )}
@@ -118,6 +139,15 @@ export default function HomePage() {
                 CW: {currentUser.wrongCount === 0 ? currentUser.correctCount : (currentUser.correctCount / currentUser.wrongCount).toFixed(2)}
               </span>
             </div>
+          </div>
+        )}
+
+        {dailyNote && (
+          <div className="mb-6 p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--teal)]/20 shadow-[3px_3px_0_var(--ink)] flex items-center justify-between gap-3 text-xs font-bold text-[var(--ink)]">
+            <span>{dailyNote}</span>
+            <button onClick={clearDailyNote} aria-label="Dismiss" className="p-1 rounded-full border-[1.5px] border-[var(--ink)] hover:bg-[var(--paper-deep)]">
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User } from '@/types';
 import { apiFetch } from '@/lib/api';
+import { DAILY_COINS } from '@/lib/shop';
 
 export interface ActionResult {
   success: boolean;
@@ -42,6 +43,9 @@ interface AuthContextType {
   deleteMyAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setCurrentUser: (u: User | null) => void;
+  /** e.g. "+5 coins for showing up today"; shown briefly after opening the site */
+  dailyNote: string | null;
+  clearDailyNote: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +55,9 @@ type UserResponse = { user?: User | null; message?: string };
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dailyNote, setDailyNote] = useState<string | null>(null);
+  const dailyFor = useRef<string | null>(null);
+  const clearDailyNote = useCallback(() => setDailyNote(null), []);
 
   const refreshUser = useCallback(async () => {
     const res = await apiFetch<UserResponse>('/api/auth/me');
@@ -64,6 +71,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     })();
   }, [refreshUser]);
+
+  // Once per page load for a signed-in member: streak freezes cover missed days, and the daily coins are paid.
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'user') return;
+    if (dailyFor.current === currentUser.id) return;
+    dailyFor.current = currentUser.id;
+    (async () => {
+      const res = await apiFetch<UserResponse & { claimed?: boolean; freezesUsed?: number }>('/api/daily', { method: 'POST' });
+      if (!res.ok) return;
+      if (res.data.user) setCurrentUser(res.data.user);
+      const notes: string[] = [];
+      if (res.data.freezesUsed) {
+        notes.push(`A streak freeze covered ${res.data.freezesUsed === 1 ? 'a missed day' : `${res.data.freezesUsed} missed days`} and saved your streak`);
+      }
+      if (res.data.claimed) notes.push(`+${DAILY_COINS} coins for showing up today`);
+      if (notes.length > 0) {
+        setDailyNote(notes.join(' • '));
+        setTimeout(() => setDailyNote(null), 9000);
+      }
+    })();
+  }, [currentUser]);
 
   const authCall = async (url: string, body: unknown): Promise<ActionResult> => {
     const res = await apiFetch<UserResponse>(url, { method: 'POST', body });
@@ -110,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ currentUser, isQM, loading, loginUser, registerUser, loginQM, updateProfile, changeUid, logout, deleteMyAccount, refreshUser, setCurrentUser }}
+      value={{ currentUser, isQM, loading, loginUser, registerUser, loginQM, updateProfile, changeUid, logout, deleteMyAccount, refreshUser, setCurrentUser, dailyNote, clearDailyNote }}
     >
       {children}
     </AuthContext.Provider>

@@ -15,25 +15,31 @@ function shiftDay(day: string, delta: number): string {
 
 /**
  * Streak = consecutive IST days on which the member answered correctly.
+ * A day covered by a streak freeze keeps the chain alive but does not add to the count.
  * The current streak stays alive through today, so it only drops to 0 once a full day was missed.
  */
-export function computeStreak(correctTimestamps: string[], now: number = Date.now()): StreakInfo {
-  const days = Array.from(new Set(correctTimestamps.map((t) => istDay(t)))).sort();
-  if (days.length === 0) return { current: 0, best: 0 };
+export function computeStreak(correctTimestamps: string[], now: number = Date.now(), frozenDays: string[] = []): StreakInfo {
+  const solved = new Set(correctTimestamps.map((t) => istDay(t)));
+  if (solved.size === 0) return { current: 0, best: 0 };
+  const frozen = new Set(frozenDays);
+  const covered = new Set<string>([...solved, ...frozen]);
+  const days = Array.from(covered).sort();
 
-  let best = 1;
-  let run = 1;
-  for (let i = 1; i < days.length; i++) {
-    run = days[i] === shiftDay(days[i - 1], 1) ? run + 1 : 1;
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const d of days) {
+    if (prev === null || d !== shiftDay(prev, 1)) run = 0;
+    if (solved.has(d)) run++;
     if (run > best) best = run;
+    prev = d;
   }
 
-  const set = new Set(days);
   const today = istDay(now);
-  let cursor = set.has(today) ? today : set.has(shiftDay(today, -1)) ? shiftDay(today, -1) : null;
+  let cursor = covered.has(today) ? today : covered.has(shiftDay(today, -1)) ? shiftDay(today, -1) : null;
   let current = 0;
-  while (cursor && set.has(cursor)) {
-    current++;
+  while (cursor && covered.has(cursor)) {
+    if (solved.has(cursor)) current++;
     cursor = shiftDay(cursor, -1);
   }
   return { current, best };

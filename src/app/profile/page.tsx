@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiFetch } from '@/lib/api';
-import { HistoryItem, ProfileStats, User } from '@/types';
+import { CoinLogItem, HistoryItem, ProfileStats, User } from '@/types';
 import { ProfileFields, ProfileValues } from '@/components/ProfileFields';
 import { SecurityFields, SecurityValues } from '@/components/SecurityFields';
 import { PasswordInput } from '@/components/PasswordInput';
 import { validateUid } from '@/lib/options';
-import { ArrowLeft, Flame, Moon, Sun, Trophy, Target, CheckCircle2, XCircle, MinusCircle, Clock } from 'lucide-react';
+import { DAILY_COINS, FREEZE_PRICE_ONE, FREEZE_PRICE_TWO, MAX_FREEZES } from '@/lib/shop';
+import { ArrowLeft, Flame, Moon, Sun, Trophy, Target, CheckCircle2, XCircle, MinusCircle, Clock, Coins, Snowflake } from 'lucide-react';
 
 const inputCls =
   'w-full px-3.5 py-2.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] text-sm shadow-[2px_2px_0_var(--ink)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:font-normal';
@@ -33,6 +34,14 @@ function Stat({ label, value, sub, icon }: { label: string; value: React.ReactNo
   );
 }
 
+const COIN_REASON: Record<string, string> = {
+  answer: 'Points from an answer',
+  daily: 'Showing up today',
+  streak: 'Streak bonus',
+  shop: 'Streak freeze purchase',
+  qm_adjust: 'Quizmaster adjustment',
+};
+
 const STATUS: Record<HistoryItem['status'], { label: string; cls: string; icon: React.ReactNode }> = {
   solved: { label: 'Solved', cls: 'bg-[var(--teal)]', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
   failed: { label: 'Out of attempts', cls: 'bg-[var(--red)] text-white', icon: <XCircle className="w-3.5 h-3.5" /> },
@@ -42,12 +51,16 @@ const STATUS: Record<HistoryItem['status'], { label: string; cls: string; icon: 
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { currentUser, loading: authLoading, updateProfile, changeUid } = useAuth();
+  const { currentUser, loading: authLoading, updateProfile, changeUid, setCurrentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [coinLog, setCoinLog] = useState<CoinLogItem[]>([]);
+  const [reload, setReload] = useState(0);
+  const [shopMsg, setShopMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [buying, setBuying] = useState<1 | 2 | null>(null);
 
   const [name, setName] = useState('');
   const [values, setValues] = useState<ProfileValues>({ designation: '', branch: '', year: '' });
@@ -85,16 +98,17 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!userId || currentUser?.role !== 'user') return;
     (async () => {
-      const res = await apiFetch<{ user?: User; stats?: ProfileStats; history?: HistoryItem[] }>('/api/profile');
+      const res = await apiFetch<{ user?: User; stats?: ProfileStats; history?: HistoryItem[]; coinLog?: CoinLogItem[] }>('/api/profile');
       if (res.ok) {
         setStats(res.data.stats ?? null);
         setHistory(res.data.history ?? []);
+        setCoinLog(res.data.coinLog ?? []);
       } else {
         setLoadError(res.data.error ?? 'Could not load your stats.');
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, reload]);
 
   const saveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +202,22 @@ export default function ProfilePage() {
   }
 
   const solved = history.filter((h) => h.status === 'solved').length;
+  const coins = currentUser.coins ?? 0;
+  const freezes = currentUser.streakFreezes ?? 0;
+
+  const buyFreeze = async (quantity: 1 | 2) => {
+    setShopMsg(null);
+    setBuying(quantity);
+    const res = await apiFetch<{ user?: User; message?: string }>('/api/shop/freeze', { method: 'POST', body: { quantity } });
+    setBuying(null);
+    if (res.ok) {
+      if (res.data.user) setCurrentUser(res.data.user);
+      setShopMsg({ kind: 'ok', text: res.data.message ?? 'Done.' });
+      setReload((n) => n + 1);
+    } else {
+      setShopMsg({ kind: 'err', text: res.data.error ?? 'Could not complete the purchase.' });
+    }
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-8">
@@ -210,8 +240,12 @@ export default function ProfilePage() {
       {/* Stats */}
       {loadError && <Notice kind="err" text={loadError} />}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Points" value={<>{stats?.points ?? currentUser.points} ★</>} icon={<Trophy className="w-3.5 h-3.5" />} />
-        <Stat label="Rank" value={stats?.rank ? `#${stats.rank}` : '—'} sub={stats ? `of ${stats.totalPlayers} members` : undefined} />
+        <Stat label="Total Points" value={<>{stats?.points ?? currentUser.points} ★</>} sub="all-time" icon={<Trophy className="w-3.5 h-3.5" />} />
+        <Stat
+          label="This Week"
+          value={<>{stats?.weeklyPoints ?? 0} ★</>}
+          sub={stats?.weeklyRank ? `Rank #${stats.weeklyRank} of ${stats.weeklyPlayers} players` : 'Not on the board yet'}
+        />
         <Stat
           label="Streak"
           value={<span className="inline-flex items-center gap-1"><Flame className="w-5 h-5 text-[var(--red)] fill-[var(--red)]" />{stats?.streak.current ?? 0}</span>}
@@ -224,6 +258,66 @@ export default function ProfilePage() {
           icon={<Target className="w-3.5 h-3.5" />}
         />
       </div>
+
+      {/* Coins and streak freezes (separate from points) */}
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label="Coins" value={coins} sub="not the same as points" icon={<Coins className="w-3.5 h-3.5" />} />
+        <Stat label="Streak Freezes" value={`${freezes} / ${MAX_FREEZES}`} sub="used automatically" icon={<Snowflake className="w-3.5 h-3.5" />} />
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-black text-[var(--ink)]">Streak Freezes</h2>
+        <div className="card-neo p-5 bg-[var(--bg-secondary)] space-y-4">
+          {shopMsg && <Notice kind={shopMsg.kind} text={shopMsg.text} />}
+          <p className="text-xs font-semibold text-[var(--text-secondary)] leading-relaxed">
+            A streak freeze covers a day you miss, so your streak survives. It is used automatically when you come back, but only if you own enough freezes to
+            cover <strong>every</strong> day you missed. You can hold at most {MAX_FREEZES}. Coins come from your answers (the same amount as the points),
+            +{DAILY_COINS} for showing up each day, and bonuses for streaks of 10 and 50 days and every 100th day. Spending coins never lowers your points or your leaderboard rank.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => buyFreeze(1)}
+              disabled={buying !== null || freezes >= MAX_FREEZES || coins < FREEZE_PRICE_ONE}
+              className="btn-neo btn-neo-primary text-xs !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Snowflake className="w-3.5 h-3.5" />
+              <span>{buying === 1 ? 'Buying…' : `Buy 1 freeze • ${FREEZE_PRICE_ONE} coins`}</span>
+            </button>
+            <button
+              onClick={() => buyFreeze(2)}
+              disabled={buying !== null || freezes > 0 || coins < FREEZE_PRICE_TWO}
+              className="btn-neo btn-neo-yellow text-xs !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Snowflake className="w-3.5 h-3.5" />
+              <span>{buying === 2 ? 'Buying…' : `Buy 2 freezes • ${FREEZE_PRICE_TWO} coins (save ${FREEZE_PRICE_ONE * 2 - FREEZE_PRICE_TWO})`}</span>
+            </button>
+          </div>
+          {freezes >= MAX_FREEZES ? (
+            <p className="text-[11px] font-bold text-[var(--text-muted)]">You are holding the maximum of {MAX_FREEZES} freezes.</p>
+          ) : freezes > 0 ? (
+            <p className="text-[11px] font-bold text-[var(--text-muted)]">The 2-pack is only available when you hold none.</p>
+          ) : null}
+
+          {coinLog.length > 0 && (
+            <div className="pt-3 border-t-[2px] border-[var(--ink)] space-y-1.5">
+              <div className="text-[11px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Recent coin activity</div>
+              {coinLog.map((c, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--ink)]">
+                  <span>
+                    {COIN_REASON[c.reason] ?? c.reason}{' '}
+                    <span className="font-mono text-[var(--text-muted)]">
+                      • {new Date(c.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short' })}
+                    </span>
+                  </span>
+                  <span className={`font-mono font-black ${c.amount < 0 ? 'text-[var(--red)]' : ''}`}>
+                    {c.amount > 0 ? '+' : ''}{c.amount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* History */}
       <section className="space-y-3">

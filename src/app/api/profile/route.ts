@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/server/db';
 import { fail, handle, json, readBody, requireUser, str, toUser, ProfileRow } from '@/lib/server/helpers';
-import { loadRanked, streaksFor } from '@/lib/server/board';
+import { loadRanked, loadWeekly, streaksFor } from '@/lib/server/board';
 import { TIERS } from '@/lib/server/qotd';
 import { istDay } from '@/lib/server/streak';
 import { normalizeSecurityAnswer, validateProfileFields, validateSecurity } from '@/lib/options';
@@ -26,9 +26,11 @@ export const GET = handle(async () => {
   const me = await requireUser();
   if (!me) return fail('Please sign in first.', 401);
 
-  const [ranked, streaks, hist] = await Promise.all([
+  const [ranked, streaks, weekly, ledger, hist] = await Promise.all([
     loadRanked(),
     streaksFor([me.id]),
+    loadWeekly(),
+    db().from('coin_ledger').select('amount, reason, created_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(15),
     db()
       .from('submissions')
       .select('question_id, is_correct, is_forfeit, points_awarded, hints_unlocked, created_at, questions(edition, title, hint_difficult, hint_medium, hint_easy)')
@@ -68,6 +70,7 @@ export const GET = handle(async () => {
   history.sort((a, b) => b.date.localeCompare(a.date) || (b.edition ?? 0) - (a.edition ?? 0));
 
   const mine = ranked.find((r) => r.id === me.id);
+  const mineWeek = weekly.entries.find((r) => r.id === me.id);
   const stats: ProfileStats = {
     points: me.points,
     correctCount: me.correct_count,
@@ -77,9 +80,20 @@ export const GET = handle(async () => {
     totalPlayers: ranked.length,
     streak: streaks.get(me.id) ?? { current: 0, best: 0 },
     questionsPlayed: history.length,
+    weeklyPoints: mineWeek?.points ?? 0,
+    weeklyRank: mineWeek?.rank ?? null,
+    weeklyPlayers: weekly.entries.length,
+    coins: me.coins ?? 0,
+    streakFreezes: me.streak_freezes ?? 0,
   };
 
-  return json({ user: toUser(me), stats, history });
+  const coinLog = ((ledger.data ?? []) as { amount: number; reason: string; created_at: string }[]).map((r) => ({
+    amount: r.amount,
+    reason: r.reason,
+    createdAt: r.created_at,
+  }));
+
+  return json({ user: toUser(me), stats, history, coinLog });
 });
 
 export const PUT = handle(async (req) => {

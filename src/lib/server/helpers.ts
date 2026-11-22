@@ -21,6 +21,8 @@ export interface ProfileRow {
   reset_fails: number;
   reset_locked_until: string | null;
   uid_changed_at: string | null;
+  coins: number;
+  streak_freezes: number;
   created_at: string;
 }
 
@@ -88,6 +90,8 @@ export function toUser(p: ProfileRow): User {
     securityQuestion: p.security_question,
     needsProfile: p.role === 'user' && (!p.year || !p.branch || !p.designation || !p.security_question),
     uidChangeableAt: uidChangeableAt(p.uid_changed_at),
+    coins: p.coins ?? 0,
+    streakFreezes: p.streak_freezes ?? 0,
     createdAt: p.created_at,
   };
 }

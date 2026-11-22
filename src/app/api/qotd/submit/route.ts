@@ -2,6 +2,10 @@ import { db } from '@/lib/server/db';
 import { fail, freshUser, handle, json, readBody, requireUser, str } from '@/lib/server/helpers';
 import { buildState, getActiveQuestion, maxAttemptsFor, partsOf, pointsPerPart, solvedPartsFor } from '@/lib/server/qotd';
 import { checkPart } from '@/lib/fuzzyMatch';
+import { streaksFor } from '@/lib/server/board';
+import { applyFreezes, awardCoins } from '@/lib/server/coins';
+import { istDay } from '@/lib/server/streak';
+import { streakBonus } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +22,9 @@ export const POST = handle(async (req) => {
   if (typeof b.questionId === 'string' && b.questionId && b.questionId !== q.id) {
     return fail('A new question has just gone live. Please read it before answering.', 409, { state: await buildState(me.id) });
   }
+
+  // A tab left open since yesterday must still get its freezes applied before today's answer is saved.
+  await applyFreezes(me.id);
 
   const parts = partsOf(q);
   // New clients send one guess per part; an old open page sends a single "guess".
@@ -76,6 +83,17 @@ export const POST = handle(async (req) => {
       return fail('You have no attempts left for this question.', 409, { state: await buildState(me.id) });
     }
     throw error;
+  }
+
+  // Streak milestones (10, 50, every 100th day) pay bonus coins, once per day.
+  if (complete) {
+    try {
+      const current = (await streaksFor([me.id])).get(me.id)?.current ?? 0;
+      const bonus = streakBonus(current);
+      if (bonus > 0) await awardCoins(me.id, bonus, 'streak', `${current}@${istDay(Date.now())}`);
+    } catch (err) {
+      console.error('[streak bonus]', err);
+    }
   }
 
   return json({ state: await buildState(me.id), user: await freshUser(me.id) });
