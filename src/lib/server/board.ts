@@ -2,10 +2,11 @@ import { db } from './db';
 import { computeStreak } from './streak';
 import type { LeaderboardEntry, StreakInfo } from '@/types';
 
-export type SortMode = 'points' | 'cw';
-
-/** Every member, ranked. (Streak is filled in separately for the few rows we show.) */
-export async function loadRanked(sort: SortMode = 'points'): Promise<LeaderboardEntry[]> {
+/**
+ * Every member, ranked by points. Ties go to the higher CW ratio, then more correct answers,
+ * then the earlier sign-up. (Streak is filled in separately for the few rows we show.)
+ */
+export async function loadRanked(): Promise<LeaderboardEntry[]> {
   const { data, error } = await db()
     .from('profiles')
     .select('id, name, uid, points, correct_count, wrong_count, created_at')
@@ -26,13 +27,9 @@ export async function loadRanked(sort: SortMode = 'points'): Promise<Leaderboard
   }));
 
   rows.sort((a, b) => {
-    if (sort === 'cw') {
-      if (b.cwRatio !== a.cwRatio) return b.cwRatio - a.cwRatio;
-      if (b.points !== a.points) return b.points - a.points;
-    } else {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
-    }
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.cwRatio !== a.cwRatio) return b.cwRatio - a.cwRatio;
+    if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
     return a.createdAt.localeCompare(b.createdAt);
   });
 

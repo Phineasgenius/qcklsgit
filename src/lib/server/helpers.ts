@@ -20,7 +20,18 @@ export interface ProfileRow {
   security_answer_hash: string | null;
   reset_fails: number;
   reset_locked_until: string | null;
+  uid_changed_at: string | null;
   created_at: string;
+}
+
+/** A member may change their UID once every this many days. */
+export const UID_CHANGE_DAYS = 365;
+
+/** When the member may change their UID next. null = they can change it now. */
+export function uidChangeableAt(changedAt: string | null): string | null {
+  if (!changedAt) return null;
+  const next = new Date(changedAt).getTime() + UID_CHANGE_DAYS * 86400000;
+  return next > Date.now() ? new Date(next).toISOString() : null;
 }
 
 export function json(data: unknown, status = 200) {
@@ -76,6 +87,7 @@ export function toUser(p: ProfileRow): User {
     designation: p.designation,
     securityQuestion: p.security_question,
     needsProfile: p.role === 'user' && (!p.year || !p.branch || !p.designation || !p.security_question),
+    uidChangeableAt: uidChangeableAt(p.uid_changed_at),
     createdAt: p.created_at,
   };
 }

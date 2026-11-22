@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/server/session';
 import { handle, json } from '@/lib/server/helpers';
-import { loadRanked, streaksFor, SortMode } from '@/lib/server/board';
+import { loadRanked, streaksFor } from '@/lib/server/board';
 import type { LeaderboardResponse } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +9,7 @@ const TOP = 10;
 const MAX_RESULTS = 25;
 
 export const GET = handle(async (req) => {
-  const sort: SortMode = new URL(req.url).searchParams.get('sort') === 'cw' ? 'cw' : 'points';
-  const ranked = await loadRanked(sort);
+  const ranked = await loadRanked();
   const session = await getSession();
   const meId = session && session.role === 'user' ? session.sub : null;
 

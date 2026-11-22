@@ -37,6 +37,7 @@ interface AuthContextType {
   registerUser: (input: RegisterInput) => Promise<ActionResult>;
   loginQM: (username: string, pass: string) => Promise<ActionResult>;
   updateProfile: (input: ProfileInput) => Promise<ActionResult>;
+  changeUid: (uid: string, password: string) => Promise<ActionResult>;
   logout: () => Promise<void>;
   deleteMyAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -86,6 +87,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, message: res.data.error ?? 'Could not save your details.' };
   };
 
+  const changeUid = async (uid: string, password: string): Promise<ActionResult> => {
+    const res = await apiFetch<UserResponse>('/api/profile/uid', { method: 'PUT', body: { uid, password } });
+    if (res.ok && res.data.user) {
+      setCurrentUser(res.data.user);
+      return { success: true, message: res.data.message ?? 'UID changed.' };
+    }
+    return { success: false, message: res.data.error ?? 'Could not change your UID.' };
+  };
+
   const logout = async () => {
     await apiFetch('/api/auth/logout', { method: 'POST' });
     setCurrentUser(null);
@@ -100,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ currentUser, isQM, loading, loginUser, registerUser, loginQM, updateProfile, logout, deleteMyAccount, refreshUser, setCurrentUser }}
+      value={{ currentUser, isQM, loading, loginUser, registerUser, loginQM, updateProfile, changeUid, logout, deleteMyAccount, refreshUser, setCurrentUser }}
     >
       {children}
     </AuthContext.Provider>

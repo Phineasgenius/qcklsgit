@@ -11,6 +11,16 @@ export const SECURITY_QUESTIONS = [
   'In which town or village did your grandparents live?',
 ] as const;
 
+export const UID_PATTERN = /^[a-z0-9._-]{4,32}$/;
+
+/** Expects the UID already trimmed and lower-cased. */
+export function validateUid(uid: string): string | null {
+  if (!UID_PATTERN.test(uid)) {
+    return 'Please enter a valid college UID (4-32 characters: letters, numbers, dot, dash or underscore).';
+  }
+  return null;
+}
+
 export function validateProfileFields(year: string, branch: string, designation: string): string | null {
   if (!(DESIGNATIONS as readonly string[]).includes(designation)) return 'Please select whether you are a Student, Graduate, Professor/Faculty or Other.';
   if (!(BRANCHES as readonly string[]).includes(branch)) return 'Please select your branch.';

@@ -27,7 +27,7 @@ export const GET = handle(async () => {
   if (!me) return fail('Please sign in first.', 401);
 
   const [ranked, streaks, hist] = await Promise.all([
-    loadRanked('points'),
+    loadRanked(),
     streaksFor([me.id]),
     db()
       .from('submissions')

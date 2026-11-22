@@ -12,6 +12,7 @@ export interface User {
   branch?: string | null;
   designation?: string | null;
   securityQuestion?: string | null;
+  uidChangeableAt?: string | null;
   /** true when a student still has to give year / branch / designation / security question */
   needsProfile?: boolean;
   createdAt: string;

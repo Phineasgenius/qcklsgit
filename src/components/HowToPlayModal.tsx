@@ -65,15 +65,6 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
             </div>
           </div>
 
-          {/* Attempts */}
-          <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--teal)]/20 shadow-[2px_2px_0_var(--ink)] space-y-1">
-            <h4 className="font-black text-xs uppercase text-[var(--ink)]">Attempts</h4>
-            <p className="text-xs text-[var(--ink)]">
-              You get <strong>one attempt per clue, plus one</strong>. A question with 3 clues gives you 4 attempts. Solve it on any of them for the points
-              (reduced if you opened clues). Answer correctly every day to build a <strong>streak</strong>.
-            </p>
-          </div>
-
           {/* Expected Funda */}
           <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--lilac)]/25 shadow-[2px_2px_0_var(--ink)] space-y-1">
             <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
@@ -89,10 +80,10 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
           <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--red)]/15 shadow-[2px_2px_0_var(--ink)] space-y-1">
             <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
               <Crosshair className="w-3.5 h-3.5" />
-              <span>Leaderboard CW (Correct/Wrong) Ratio</span>
+              <span>Leaderboard Tie-Breaker</span>
             </h4>
             <p className="text-xs text-[var(--ink)]">
-              The leaderboard tracks your <strong>CW Ratio (Correct Answers ÷ Wrong Attempts)</strong> alongside raw points, rewarding precision!
+              The leaderboard ranks by points. If two members have the same points, the one with the higher <strong>CW Ratio (Correct Answers ÷ Wrong Attempts)</strong> ranks higher, so precision pays off!
             </p>
           </div>
         </div>

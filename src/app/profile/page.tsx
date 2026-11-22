@@ -10,6 +10,7 @@ import { HistoryItem, ProfileStats, User } from '@/types';
 import { ProfileFields, ProfileValues } from '@/components/ProfileFields';
 import { SecurityFields, SecurityValues } from '@/components/SecurityFields';
 import { PasswordInput } from '@/components/PasswordInput';
+import { validateUid } from '@/lib/options';
 import { ArrowLeft, Flame, Moon, Sun, Trophy, Target, CheckCircle2, XCircle, MinusCircle, Clock } from 'lucide-react';
 
 const inputCls =
@@ -41,7 +42,7 @@ const STATUS: Record<HistoryItem['status'], { label: string; cls: string; icon: 
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { currentUser, loading: authLoading, updateProfile } = useAuth();
+  const { currentUser, loading: authLoading, updateProfile, changeUid } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [stats, setStats] = useState<ProfileStats | null>(null);
@@ -53,6 +54,11 @@ export default function ProfilePage() {
   const [security, setSecurity] = useState<SecurityValues>({ question: '', answer: '' });
   const [infoMsg, setInfoMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [savingInfo, setSavingInfo] = useState(false);
+
+  const [newUid, setNewUid] = useState('');
+  const [uidPass, setUidPass] = useState('');
+  const [uidMsg, setUidMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [savingUid, setSavingUid] = useState(false);
 
   const [curPass, setCurPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -111,6 +117,27 @@ export default function ProfilePage() {
       setInfoMsg({ kind: 'ok', text: 'Your details were saved.' });
     } else {
       setInfoMsg({ kind: 'err', text: res.message });
+    }
+  };
+
+  const saveUid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUidMsg(null);
+    const next = newUid.trim().toLowerCase();
+    const err = validateUid(next);
+    if (err) return setUidMsg({ kind: 'err', text: err });
+    if (next === currentUser?.uid.toLowerCase()) return setUidMsg({ kind: 'err', text: 'That is already your UID.' });
+    if (!uidPass) return setUidMsg({ kind: 'err', text: 'Please enter your password to confirm.' });
+    if (!confirm(`Change your UID from "${currentUser?.uid}" to "${next}"?\n\nYou will not be able to change it again for a year.`)) return;
+    setSavingUid(true);
+    const res = await changeUid(next, uidPass);
+    setSavingUid(false);
+    if (res.success) {
+      setNewUid('');
+      setUidPass('');
+      setUidMsg({ kind: 'ok', text: `Your UID is now ${next}. Use it to sign in from now on.` });
+    } else {
+      setUidMsg({ kind: 'err', text: res.message });
     }
   };
 
@@ -248,7 +275,7 @@ export default function ProfilePage() {
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ananya Patil" className={`${inputCls} font-semibold`} />
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>College UID (cannot be changed)</label>
+              <label className={labelCls}>College UID (change it in the section below)</label>
               <input type="text" value={currentUser.uid} readOnly className={`${inputCls} font-mono font-bold opacity-70 cursor-not-allowed`} />
             </div>
           </div>
@@ -262,6 +289,49 @@ export default function ProfilePage() {
           <div className="flex justify-end">
             <button type="submit" disabled={savingInfo} className="btn-neo btn-neo-primary text-xs !py-2.5 !px-5">{savingInfo ? 'Saving…' : 'Save Changes'}</button>
           </div>
+        </form>
+      </section>
+
+      {/* UID */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-black text-[var(--ink)]">College UID</h2>
+        <form onSubmit={saveUid} className="card-neo p-5 bg-[var(--bg-secondary)] space-y-4">
+          {uidMsg && <Notice kind={uidMsg.kind} text={uidMsg.text} />}
+          <p className="text-xs font-semibold text-[var(--text-secondary)] leading-relaxed">
+            Signed up with a temporary USN? Replace it with your permanent college UID once you get it. Your points, streak and history stay with you.
+            You can change your UID only <strong>once a year</strong>, and it cannot belong to another member.
+          </p>
+          {currentUser.uidChangeableAt ? (
+            <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper-deep)] text-xs font-bold text-[var(--ink)]">
+              You can change your UID again on{' '}
+              {new Date(currentUser.uidChangeableAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}.
+            </div>
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className={labelCls}>New college UID</label>
+                  <input
+                    type="text"
+                    value={newUid}
+                    onChange={(e) => setNewUid(e.target.value)}
+                    placeholder="e.g. 24u0101"
+                    autoComplete="off"
+                    className={`${inputCls} font-mono font-bold placeholder:font-sans placeholder:font-normal`}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className={labelCls}>Your password (to confirm)</label>
+                  <PasswordInput value={uidPass} onChange={setUidPass} placeholder="Your current password" autoComplete="current-password" />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" disabled={savingUid} className="btn-neo btn-neo-primary text-xs !py-2.5 !px-5">
+                  {savingUid ? 'Changing…' : 'Change UID'}
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </section>
 

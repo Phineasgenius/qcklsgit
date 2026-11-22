@@ -3,10 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 import { LeaderboardEntry, LeaderboardResponse } from '@/types';
-import { Award, Target, Flame, Search, X } from 'lucide-react';
+import { Flame, Search, X } from 'lucide-react';
 import styles from './LeaderboardView.module.css';
-
-type Sort = 'points' | 'cw';
 
 const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : '3rd');
 
@@ -34,10 +32,6 @@ function PodiumCard({ user, rank }: { user: LeaderboardEntry; rank: 1 | 2 | 3 })
         <div className={styles.podiumStat}>
           <span className={styles.statDot} style={{ background: 'var(--red)' }} />
           <span>{user.wrongCount} W</span>
-        </div>
-        <div className={styles.podiumStat}>
-          <span className={styles.statDot} style={{ background: 'var(--yellow)' }} />
-          <span>{user.cwRatio.toFixed(2)} CW</span>
         </div>
       </div>
 
@@ -74,7 +68,6 @@ function TableRow({ player, isMe }: { player: LeaderboardEntry; isMe: boolean })
         <div className={styles.pills}>
           <span className={`${styles.pill} ${styles.correctPill}`}>{player.correctCount} C</span>
           <span className={`${styles.pill} ${styles.wrongPill}`}>{player.wrongCount} W</span>
-          <span className={`${styles.pill} ${styles.ratioPill}`} title="Correct ÷ Wrong">{player.cwRatio.toFixed(2)} CW</span>
         </div>
       </td>
       <td style={{ textAlign: 'center' }}>
@@ -93,7 +86,6 @@ function TableRow({ player, isMe }: { player: LeaderboardEntry; isMe: boolean })
 
 export function LeaderboardView() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
-  const [sortBy, setSortBy] = useState<Sort>('points');
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [loading, setLoading] = useState(true);
@@ -109,8 +101,8 @@ export function LeaderboardView() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const q = debounced ? `&q=${encodeURIComponent(debounced)}` : '';
-      const res = await apiFetch<Partial<LeaderboardResponse>>(`/api/leaderboard?sort=${sortBy}${q}`);
+      const q = debounced ? `?q=${encodeURIComponent(debounced)}` : '';
+      const res = await apiFetch<Partial<LeaderboardResponse>>(`/api/leaderboard${q}`);
       if (cancelled) return;
       if (res.ok) {
         setData({
@@ -129,7 +121,7 @@ export function LeaderboardView() {
     return () => {
       cancelled = true;
     };
-  }, [sortBy, debounced]);
+  }, [debounced]);
 
   const entries = data?.entries ?? [];
   const searching = Boolean(data?.query);
@@ -141,8 +133,8 @@ export function LeaderboardView() {
 
   return (
     <div className={styles.wrapper}>
-      {/* Podium: shown for the top 10 view, sorted by points */}
-      {!searching && sortBy === 'points' && podium.length > 0 && (
+      {/* Podium: shown for the top 10 view */}
+      {!searching && podium.length > 0 && (
         <section className={styles.podiumSection}>
           <h3 className={styles.podiumTitle}>Top Quizzers</h3>
           <div className={styles.podiumContainer}>
@@ -169,18 +161,6 @@ export function LeaderboardView() {
               <X size={16} />
             </button>
           )}
-        </div>
-
-        <div className={styles.sortOptions}>
-          <span className={styles.sortLabel}>Sort By:</span>
-          <div className={styles.sortButtonGroup}>
-            <button onClick={() => setSortBy('points')} className={`${styles.sortButton} ${sortBy === 'points' ? styles.sortButtonActive : ''}`}>
-              <Award size={14} /> Points
-            </button>
-            <button onClick={() => setSortBy('cw')} className={`${styles.sortButton} ${sortBy === 'cw' ? styles.sortButtonActive : ''}`}>
-              <Target size={14} /> CW Ratio
-            </button>
-          </div>
         </div>
       </div>
 
