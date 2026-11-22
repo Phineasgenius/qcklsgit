@@ -16,8 +16,10 @@ import {
   Check,
   Lightbulb,
   CalendarDays,
-  Pencil
+  Pencil,
+  Image as ImageIcon
 } from 'lucide-react';
+import { uploadQuestionImage } from '@/lib/clientImage';
 
 /** Today's date in IST as YYYY-MM-DD. */
 function todayIST() {
@@ -77,6 +79,10 @@ export function QuizmasterDashboard({
   const [parts, setParts] = useState<PartForm[]>(emptyParts);
   const [explanation, setExplanation] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [hasImage, setHasImage] = useState(false);
+  const [imagePath, setImagePath] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formMsg, setFormMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -127,6 +133,9 @@ export function QuizmasterDashboard({
     setExplanation('');
     setScheduledDate('');
     setEditingId(null);
+    setHasImage(false);
+    setImagePath('');
+    setImageUrl('');
     setFormMsg('');
   };
 
@@ -146,8 +155,27 @@ export function QuizmasterDashboard({
     setPartCount(Math.max(1, Math.min(5, q.parts.length)));
     setExplanation(q.explanation ?? '');
     setScheduledDate(q.scheduledDate ?? '');
+    setHasImage(Boolean(q.imagePath));
+    setImagePath(q.imagePath ?? '');
+    setImageUrl(q.imageUrl ?? '');
     setFormMsg('');
     setActiveTab('new');
+  };
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setFormMsg('');
+    setUploadingImage(true);
+    try {
+      const r = await uploadQuestionImage(file);
+      setImagePath(r.path);
+      setImageUrl(r.url);
+    } catch (err) {
+      setFormMsg(err instanceof Error ? err.message : 'Could not upload the image.');
+    }
+    setUploadingImage(false);
   };
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -159,6 +187,9 @@ export function QuizmasterDashboard({
     if (!hintDifficult.trim()) return setFormMsg('Hint 1 is empty. Please provide at least the first clue.');
     if (hintCount >= 2 && !hintMedium.trim()) return setFormMsg('Hint 2 is empty. Please provide the medium clue.');
     if (hintCount === 3 && !hintEasy.trim()) return setFormMsg('Hint 3 is empty. Please provide the easiest clue.');
+
+    if (uploadingImage) return setFormMsg('Please wait for the image upload to finish.');
+    if (hasImage && !imagePath) return setFormMsg('Please upload the image, or choose "No" for the image question.');
 
     const active = parts.slice(0, partCount);
     for (let i = 0; i < active.length; i++) {
@@ -183,6 +214,7 @@ export function QuizmasterDashboard({
         })),
         explanation,
         scheduledDate,
+        imagePath: hasImage ? imagePath : '',
       },
     });
     setSaving(false);
@@ -397,6 +429,12 @@ export function QuizmasterDashboard({
                             {isActive || q.status === 'archived' ? 'Date' : 'Goes live'}: {fmtDate(q.scheduledDate)}
                           </span>
                         )}
+                        {q.imageUrl && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--paper-deep)] text-[var(--ink)] border-[1.5px] border-[var(--ink)] inline-flex items-center gap-1">
+                            <ImageIcon className="w-3 h-3" />
+                            Image
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-extrabold text-base text-[var(--ink)]">
                         {q.title}
@@ -512,6 +550,58 @@ export function QuizmasterDashboard({
                 placeholder="Write the full question here…"
                 className="w-full px-3 py-2 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--paper)] text-xs font-medium placeholder:text-[var(--text-muted)]"
               />
+            </div>
+
+            {/* Optional picture */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <label className="text-xs font-black uppercase text-[var(--text-secondary)]">
+                  Does this question have an image?
+                </label>
+                <div className="flex gap-1.5">
+                  {[false, true].map((v) => (
+                    <button
+                      type="button"
+                      key={String(v)}
+                      onClick={() => setHasImage(v)}
+                      className={`px-3.5 py-1.5 rounded-xl border-[2px] border-[var(--ink)] text-xs font-black transition-all ${
+                        hasImage === v ? 'bg-[var(--yellow)] text-[#1b1712] shadow-[2px_2px_0_var(--ink)]' : 'bg-[var(--paper)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {v ? 'Yes' : 'No'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {hasImage && (
+                <div className="p-3 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--bg-secondary)] space-y-2.5">
+                  {imageUrl && (
+                    <div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt="Question picture preview"
+                        className="max-h-52 max-w-full object-contain rounded-lg border-[2px] border-[var(--ink)] bg-white"
+                      />
+                    </div>
+                  )}
+                  <label className="btn-neo btn-neo-secondary text-xs !py-1.5 !px-3 inline-flex items-center gap-1.5 cursor-pointer">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>{uploadingImage ? 'Uploading…' : imageUrl ? 'Replace image' : 'Choose image'}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadingImage}
+                      onChange={handleImagePick}
+                    />
+                  </label>
+                  <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                    JPG, PNG or WebP. Large pictures are resized automatically. Members see it right under the question text.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Hint Tier 1 */}

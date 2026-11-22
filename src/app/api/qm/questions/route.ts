@@ -2,6 +2,7 @@ import { db } from '@/lib/server/db';
 import { fail, handle, isQM, json, readBody } from '@/lib/server/helpers';
 import { partsOf, type QuestionRow } from '@/lib/server/qotd';
 import { parseQuestionInput, questionColumns, todayIST } from '@/lib/server/questionInput';
+import { imageUrl } from '@/lib/server/images';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,8 @@ export const GET = handle(async () => {
     explanation: q.explanation ?? undefined,
     status: q.status,
     scheduledDate: q.scheduled_date ?? undefined,
+    imagePath: q.image_path ?? undefined,
+    imageUrl: imageUrl(q.image_path),
     createdAt: q.created_at,
   }));
   return json({ questions });

@@ -1,4 +1,5 @@
 import { str } from './helpers';
+import { IMAGE_PATH_RE } from './images';
 import type { PartRow } from './qotd';
 
 export const MAX_PARTS = 5;
@@ -21,6 +22,8 @@ export interface ParsedQuestion {
   explanation: string;
   parts: PartRow[];
   scheduledDate: string;
+  /** undefined = leave the image as it is; '' = no image */
+  imagePath?: string;
 }
 
 /** Validates the body sent by the Quizmaster console (used for both create and edit). */
@@ -37,6 +40,12 @@ export function parseQuestionInput(b: Record<string, unknown>): { value: ParsedQ
   if (!questionText) return { error: 'Question text is empty.' };
   if (!hintDifficult) return { error: 'Hint 1 is empty. Please provide at least the first clue.' };
   if (scheduledDate && !validDate(scheduledDate)) return { error: 'The date is not valid.' };
+
+  let imagePath: string | undefined;
+  if (b.imagePath !== undefined) {
+    imagePath = str(b.imagePath, 60);
+    if (imagePath && !IMAGE_PATH_RE.test(imagePath)) return { error: 'The image is not valid. Please upload it again.' };
+  }
 
   // Older clients sent a single "answer"; treat it as a 1-part question.
   let rawParts: unknown[] = Array.isArray(b.parts) ? b.parts : [];
@@ -77,7 +86,7 @@ export function parseQuestionInput(b: Record<string, unknown>): { value: ParsedQ
     parts.push({ label, answer, alternatives });
   }
 
-  return { value: { title, questionText, hintDifficult, hintMedium, hintEasy, explanation, parts, scheduledDate } };
+  return { value: { title, questionText, hintDifficult, hintMedium, hintEasy, explanation, parts, scheduledDate, imagePath } };
 }
 
 /** Database columns for a parsed question. Old funda columns are left empty on purpose. */
@@ -95,5 +104,6 @@ export function questionColumns(v: ParsedQuestion) {
     funda_keywords: [] as string[],
     is_funda: false,
     scheduled_date: v.scheduledDate || null,
+    ...(v.imagePath !== undefined ? { image_path: v.imagePath || null } : {}),
   };
 }

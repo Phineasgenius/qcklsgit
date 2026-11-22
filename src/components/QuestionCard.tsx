@@ -161,6 +161,17 @@ export function QuestionCard({ qotd, onChange, onOpenShareModal }: QuestionCardP
           <span>Question of the Day</span>
         </div>
         <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold leading-snug tracking-tight text-[var(--ink)]">{question.questionText}</h2>
+
+        {question.imageUrl && (
+          <div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={question.imageUrl}
+              alt={`Picture for ${question.title}`}
+              className="w-full max-h-[460px] object-contain rounded-xl border-[2px] border-[var(--ink)] bg-white shadow-[4px_4px_0_var(--ink)]"
+            />
+          </div>
+        )}
         <p className="text-xs font-semibold text-[var(--text-secondary)]">
           {multi && (
             <>

@@ -16,6 +16,9 @@ export interface User {
   needsProfile?: boolean;
   /** When the member may change their UID next (null = can change now). */
   uidChangeableAt?: string | null;
+  /** coins to spend on streak freezes (not the same as points) */
+  coins?: number;
+  streakFreezes?: number;
   createdAt: string;
 }
 
@@ -31,6 +34,8 @@ export interface Question {
   availableHints: HintTier[];
   /** One entry per answer the question asks for (label is empty for a single-answer question). */
   parts: { label: string }[];
+  /** Optional picture shown with the question. */
+  imageUrl?: string;
 }
 
 /** One answer of a question, as seen by the quizmaster. */
@@ -54,6 +59,9 @@ export interface QMQuestion {
   explanation?: string;
   status: 'draft' | 'active' | 'archived';
   scheduledDate?: string;
+  /** file name in the question-images bucket, and its public address */
+  imagePath?: string;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -111,6 +119,20 @@ export interface LeaderboardResponse {
   total: number;
   /** set when the response is a search result instead of the top 10 */
   query?: string;
+  /** set for the weekly board: Monday and Sunday (YYYY-MM-DD, IST) of the week shown */
+  week?: { start: string; end: string };
+}
+
+export interface WeeklyWinnersWeek {
+  weekStart: string;
+  weekEnd: string;
+  winners: { rank: number; name: string; uid: string; points: number; correctCount: number; wrongCount: number }[];
+}
+
+export interface WinnersResponse {
+  weeks: WeeklyWinnersWeek[];
+  /** Monday of the week that just ended */
+  lastWeekStart: string;
 }
 
 export interface ProfileStats {
@@ -122,6 +144,18 @@ export interface ProfileStats {
   totalPlayers: number;
   streak: StreakInfo;
   questionsPlayed: number;
+  /** points earned in the current Monday-Sunday week */
+  weeklyPoints: number;
+  weeklyRank: number | null;
+  weeklyPlayers: number;
+  coins: number;
+  streakFreezes: number;
+}
+
+export interface CoinLogItem {
+  amount: number;
+  reason: string;
+  createdAt: string;
 }
 
 export interface HistoryItem {

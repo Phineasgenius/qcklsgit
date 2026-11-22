@@ -86,6 +86,29 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
               The leaderboard ranks by points. If two members have the same points, the one with the higher <strong>CW Ratio (Correct Answers ÷ Wrong Attempts)</strong> ranks higher, so precision pays off!
             </p>
           </div>
+
+          {/* Weekly leaderboard */}
+          <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--teal)]/20 shadow-[2px_2px_0_var(--ink)] space-y-1">
+            <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
+              <Star className="w-3.5 h-3.5" />
+              <span>Weekly Leaderboard</span>
+            </h4>
+            <p className="text-xs text-[var(--ink)]">
+              The leaderboard resets every <strong>Monday at 12:00 am IST</strong> and counts points from Monday to Sunday. The top 3 of every week are saved under <strong>Past Winners</strong>. Your streak and all-time points never reset.
+            </p>
+          </div>
+
+          {/* Coins */}
+          <div className="p-3.5 rounded-xl border-[2px] border-[var(--ink)] bg-[var(--yellow)]/25 shadow-[2px_2px_0_var(--ink)] space-y-1">
+            <h4 className="font-black text-xs uppercase text-[var(--ink)] flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Coins &amp; Streak Freezes</span>
+            </h4>
+            <p className="text-xs text-[var(--ink)]">
+              Coins are separate from points. You earn the same number of coins as the points from each answer, <strong>+5</strong> for showing up each day, and bonuses at streaks of <strong>10</strong> and <strong>50</strong> days and every <strong>100th</strong> day.
+              A <strong>streak freeze</strong> (900 coins, or 2 for 1,500) saves your streak if you miss a day. You can hold at most 2. Buy them on your Profile.
+            </p>
+          </div>
         </div>
 
         {/* Footer */}

@@ -1,20 +1,23 @@
 import { getSession } from '@/lib/server/session';
 import { handle, json } from '@/lib/server/helpers';
-import { loadRanked, streaksFor } from '@/lib/server/board';
-import type { LeaderboardResponse } from '@/types';
+import { loadWeekly, streaksFor } from '@/lib/server/board';
+import type { LeaderboardEntry, LeaderboardResponse } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 const TOP = 10;
 const MAX_RESULTS = 25;
 
+/** The leaderboard is the current week only (Monday to Sunday, IST): weekly points, not totals. */
 export const GET = handle(async (req) => {
-  const ranked = await loadRanked();
+  const url = new URL(req.url);
+  const { entries: ranked, week } = await loadWeekly();
+
   const session = await getSession();
   const meId = session && session.role === 'user' ? session.sub : null;
 
-  // Search: any member by name or UID, shown with their real rank
-  const q = (new URL(req.url).searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 50);
+  // Search: any player this week by name or UID, shown with their real rank
+  const q = (url.searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 50);
   if (q) {
     const found = ranked.filter((e) => e.name.toLowerCase().includes(q) || e.uid.toLowerCase().includes(q)).slice(0, MAX_RESULTS);
     const sx = await streaksFor(found.map((f) => f.id));
@@ -24,6 +27,7 @@ export const GET = handle(async (req) => {
       meId,
       total: ranked.length,
       query: q,
+      week,
     };
     return json(body);
   }
@@ -33,13 +37,14 @@ export const GET = handle(async (req) => {
   const meOutside = mine && mine.rank > TOP ? mine : null;
 
   const streaks = await streaksFor([...top.map((t) => t.id), ...(meOutside ? [meOutside.id] : [])]);
-  const withStreak = (e: (typeof ranked)[number]) => ({ ...e, streak: streaks.get(e.id)?.current ?? 0 });
+  const withStreak = (e: LeaderboardEntry) => ({ ...e, streak: streaks.get(e.id)?.current ?? 0 });
 
   const body: LeaderboardResponse = {
     entries: top.map(withStreak),
     me: meOutside ? withStreak(meOutside) : null,
     meId,
     total: ranked.length,
+    week,
   };
   return json(body);
 });

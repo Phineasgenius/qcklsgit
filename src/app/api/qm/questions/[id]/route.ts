@@ -1,6 +1,7 @@
 import { db } from '@/lib/server/db';
 import { fail, handle, isQM, json, readBody } from '@/lib/server/helpers';
 import { parseQuestionInput, questionColumns, todayIST } from '@/lib/server/questionInput';
+import { removeImage } from '@/lib/server/images';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,11 +22,12 @@ export const PATCH = handle<Ctx>(async (_req, { params }) => {
 export const DELETE = handle<Ctx>(async (_req, { params }) => {
   if (!(await isQM())) return fail('Quizmaster access required.', 403);
   const { id } = await params;
-  const q = await db().from('questions').select('status').eq('id', id).maybeSingle();
+  const q = await db().from('questions').select('status, image_path').eq('id', id).maybeSingle();
   if (!q.data) return fail('Question not found.', 404);
   if (q.data.status === 'active') return fail('This is the live question. Make another question active before deleting it.');
   const { error } = await db().from('questions').delete().eq('id', id);
   if (error) throw error;
+  await removeImage(q.data.image_path);
   return json({ ok: true });
 });
 
@@ -38,7 +40,7 @@ export const PUT = handle<Ctx>(async (req, { params }) => {
   if ('error' in parsed) return fail(parsed.error);
   const v = parsed.value;
 
-  const cur = await db().from('questions').select('id, parts, scheduled_date').eq('id', id).maybeSingle();
+  const cur = await db().from('questions').select('id, parts, scheduled_date, image_path').eq('id', id).maybeSingle();
   if (!cur.data) return fail('Question not found.', 404);
 
   // The number of answers is locked once members have submitted (their per-part progress depends on it).
@@ -60,6 +62,10 @@ export const PUT = handle<Ctx>(async (req, { params }) => {
       return fail('Another waiting question is already scheduled for that date.', 409);
     }
     throw error;
+  }
+  // The picture was replaced or removed: delete the old file.
+  if (cur.data.image_path && v.imagePath !== undefined && v.imagePath !== cur.data.image_path) {
+    await removeImage(cur.data.image_path);
   }
   return json({ ok: true });
 });

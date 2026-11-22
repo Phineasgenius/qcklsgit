@@ -1,6 +1,7 @@
 import { db } from './db';
 import { streaksFor } from './board';
 import { splitPoints } from '@/lib/points';
+import { imageUrl } from './images';
 import type { HintTier, QotdState, QotdAttempt } from '@/types';
 
 export interface PartRow {
@@ -25,6 +26,7 @@ export interface QuestionRow {
   status: 'draft' | 'active' | 'archived';
   published_at: string | null;
   scheduled_date?: string | null;
+  image_path?: string | null;
   created_at: string;
 }
 
@@ -149,6 +151,7 @@ export async function buildState(userId: string | null): Promise<QotdState> {
       date: istDate(q.published_at),
       availableHints: TIERS.filter((t) => hintText(q, t) !== null),
       parts: parts.map((p) => ({ label: p.label })),
+      imageUrl: imageUrl(q.image_path),
     },
     maxAttempts: max,
   };
